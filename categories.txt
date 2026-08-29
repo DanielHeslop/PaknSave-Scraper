@@ -1,0 +1,19 @@
+# List of PAK'nSAVE category pages to scrape.
+# One category per line. Each line is independent.
+#
+# Format:
+#   <url> [pages=N] [category=name]
+#
+# pages=N  - also scrape N-1 more pages using PAK'nSAVE's own ?pg= paging
+#            (default 1, i.e. just this page).
+# category=name - override the category label used in the output
+#            (default: derived from the last part of the URL).
+#
+# Lines starting with # are comments and ignored.
+# Started small on purpose (one category per department) - add more lines
+# here as you confirm the scraper works well against each one.
+
+https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/milk/fresh-milk category=milk
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/chicken--poultry category=chicken
+https://www.paknsave.co.nz/shop/category/pantry/breakfast-cereals category=cereal

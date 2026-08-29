@@ -1,0 +1,17 @@
+# Manual corrections for products the scraper can't read cleanly on its own.
+#
+# Format, one product per line:
+#   <product-id> <size>     - use this size instead of (or when missing) the
+#                              scraped one, and recalculate its unit price
+#                              to match.
+#   <product-id> skip       - drop this product entirely, don't include it
+#                              in any output.
+#
+# Lines starting with # are comments and ignored.
+#
+# This file starts empty - add a line here whenever you notice a specific
+# product with a wrong or missing size in the scraper's output.
+#
+# Examples (commented out - not real corrections, just showing the format):
+# P5019270 1020g
+# P1234567 skip

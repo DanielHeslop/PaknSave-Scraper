@@ -1,0 +1,66 @@
+<!--
+Synthetic sample HTML for offline testing only.
+
+This is NOT captured from the live PAK'nSAVE site - this environment's
+network policy blocked reaching paknsave.co.nz, so Step 0 verification
+could not be performed here (see README.md "Known limitation"). This
+fixture is hand-built to match the data-testid structure documented by the
+reference project (Jason-nzd/pakn-scraper), purely so extract.py and its
+tests have something concrete to run against. It must be checked against
+the real site's actual HTML before this scraper is trusted in production.
+-->
+<!DOCTYPE html>
+<html>
+<body>
+
+  <!-- A normal product, sold by weight (KGM), with a full set of fields -->
+  <div data-testid="fs-product-card-P5012345-KGM-000">
+    <a>
+      <div><img src="https://fsimg.co.nz/product/retail/fan/image/200x200/5012345.jpg?v=1"></div>
+    </a>
+    <p data-testid="product-title">Anchor Blue Milk Powder</p>
+    <p data-testid="product-subtitle">1kg</p>
+    <p data-testid="price-dollars">21</p>
+    <p data-testid="price-cents">99</p>
+    <p>$21.99/1kg</p>
+  </div>
+
+  <!-- A product sold each, with no comparable unit price - normal, not an error -->
+  <div data-testid="fs-product-card-P3457825-EA-000">
+    <a>
+      <div><img src="https://fsimg.co.nz/product/retail/fan/image/200x200/3457825.jpg?v=1"></div>
+    </a>
+    <p data-testid="product-title">Belgium Slice</p>
+    <p data-testid="product-subtitle">Each</p>
+    <p data-testid="price-dollars">5</p>
+    <p data-testid="price-cents">89</p>
+  </div>
+
+  <!-- A product with a small raw unit (grams) that needs rescaling to /kg -->
+  <div data-testid="fs-product-card-P5026147-KGM-000">
+    <a>
+      <div><img src="https://fsimg.co.nz/product/retail/fan/image/200x200/5026147.jpg?v=1"></div>
+    </a>
+    <p data-testid="product-title">Bakery Crunchy Bran</p>
+    <p data-testid="product-subtitle">230g</p>
+    <p data-testid="price-dollars">4</p>
+    <p data-testid="price-cents">49</p>
+    <p>$1.95/100g</p>
+  </div>
+
+  <!-- A product missing its price entirely - should be dropped -->
+  <div data-testid="fs-product-card-P9999999-EA-000">
+    <a>
+      <div><img src="https://fsimg.co.nz/product/retail/fan/image/200x200/9999999.jpg?v=1"></div>
+    </a>
+    <p data-testid="product-title">Out Of Stock Item</p>
+    <p data-testid="product-subtitle">Each</p>
+  </div>
+
+  <!-- Not a product tile at all - should be ignored entirely -->
+  <div data-testid="site-header">
+    <p>PAK'nSAVE</p>
+  </div>
+
+</body>
+</html>
