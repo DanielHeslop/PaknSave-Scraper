@@ -16,6 +16,7 @@ import re
 import sys
 
 from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
 
 URL = "https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/vegetables"
 
@@ -34,7 +35,11 @@ def not_found(label, detail):
 
 
 def main():
-    with sync_playwright() as p:
+    # Recommended playwright-stealth v2 usage: wrap the sync_playwright() context
+    # manager itself so every browser/context/page created underneath it
+    # automatically gets stealth evasions applied (navigator.webdriver, chrome.*,
+    # UA/sec-ch-ua spoofing, etc.) - see the package README for this pattern.
+    with Stealth().use_sync(sync_playwright()) as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 

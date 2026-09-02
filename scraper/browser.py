@@ -11,6 +11,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
+
 GOTO_TIMEOUT_MS = 8000
 MAX_LOAD_ATTEMPTS = 3
 LAZY_LOAD_SCROLL_PRESSES = 3
@@ -72,6 +75,28 @@ def parse_categories_file(path: str | Path) -> list[CategoryPage]:
 def _derive_category_from_url(url: str) -> str:
     without_query = url.split("?")[0]
     return without_query.rstrip("/").split("/")[-1] or "uncategorised"
+
+
+def stealth_playwright():
+    """Start Playwright's async API with playwright-stealth applied.
+
+    step0_verify.py confirmed this technique against the live site using
+    the sync API: `Stealth().use_sync(sync_playwright())`. The real scraper
+    (scraper/run.py) uses Playwright's async API throughout, so this uses
+    that pattern's documented async counterpart instead:
+    `Stealth().use_async(async_playwright())` - the other officially
+    documented usage in the same playwright-stealth README, not a guess.
+
+    Wrapping the context manager itself (rather than calling
+    apply_stealth on a page after the fact) means every browser, context,
+    and page opened through the returned object automatically gets stealth
+    evasions applied - navigator.webdriver hidden, chrome.* runtime/plugin
+    fingerprints spoofed, a real Chrome user-agent/sec-ch-ua substituted for
+    headless Chrome's, etc. This is the only place the real scraper should
+    ever call async_playwright() directly, so every browser session it
+    opens goes through this.
+    """
+    return Stealth().use_async(async_playwright())
 
 
 class PageLoadTimeout(Exception):

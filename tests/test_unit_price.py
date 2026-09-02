@@ -57,6 +57,46 @@ def test_derive_from_override_size_unrecognised_returns_none():
     assert result is None
 
 
+# Real "$X/Yunit" text confirmed on the live vegetables category page via
+# step0_verify.py (with playwright-stealth) on 2026-09-02 - not invented
+# examples. "1kg" (a number directly followed by the unit, not bare "kg")
+# and "ea" (not the literal word "each") are the two live-site shapes these
+# cases exist to pin down.
+def test_real_example_229_per_1kg():
+    result = parse_raw_unit_price("$2.29/1kg")
+    assert result is not None
+    assert result.amount == 2.29
+    assert result.unit == "kg"
+
+
+def test_real_example_599_per_1kg():
+    result = parse_raw_unit_price("$5.99/1kg")
+    assert result is not None
+    assert result.amount == 5.99
+    assert result.unit == "kg"
+
+
+def test_real_example_150_per_ea():
+    result = parse_raw_unit_price("$1.50/ea")
+    assert result is not None
+    assert result.amount == 1.50
+    assert result.unit == "each"
+
+
+def test_real_example_199_per_1kg():
+    result = parse_raw_unit_price("$1.99/1kg")
+    assert result is not None
+    assert result.amount == 1.99
+    assert result.unit == "kg"
+
+
+def test_real_example_1099_per_1kg():
+    result = parse_raw_unit_price("$10.99/1kg")
+    assert result is not None
+    assert result.amount == 10.99
+    assert result.unit == "kg"
+
+
 if __name__ == "__main__":
     tests = [
         test_grams_rescaled_to_per_kg,
@@ -67,6 +107,11 @@ if __name__ == "__main__":
         test_ml_rescaled_to_per_litre,
         test_derive_from_override_size_grams,
         test_derive_from_override_size_unrecognised_returns_none,
+        test_real_example_229_per_1kg,
+        test_real_example_599_per_1kg,
+        test_real_example_150_per_ea,
+        test_real_example_199_per_1kg,
+        test_real_example_1099_per_1kg,
     ]
     for t in tests:
         t()

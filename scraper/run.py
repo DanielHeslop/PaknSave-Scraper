@@ -23,9 +23,12 @@ import os
 import sys
 from datetime import date, datetime, timezone
 
-from playwright.async_api import async_playwright
-
-from scraper.browser import PageLoadTimeout, navigate_and_wait_ready, parse_categories_file
+from scraper.browser import (
+    PageLoadTimeout,
+    navigate_and_wait_ready,
+    parse_categories_file,
+    stealth_playwright,
+)
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
 from scraper.overrides import load_overrides
 from scraper.storage import update_price_history, write_snapshot
@@ -88,7 +91,12 @@ async def scrape_all(categories_path: str, overrides_path: str, headed: bool) ->
     skipped_pages: list[str] = []
     scraped_at = date.today().isoformat()
 
-    async with async_playwright() as p:
+    # stealth_playwright() (scraper/browser.py) wraps async_playwright() with
+    # playwright-stealth, so every browser/context/page opened below - the
+    # only browser session this real scraper opens - automatically gets the
+    # same stealth evasions that got step0_verify.py past PAK'nSAVE's
+    # Cloudflare challenge.
+    async with stealth_playwright() as p:
         launch_kwargs = {"headless": not headed}
         # Optional override for environments with a pre-installed Chromium
         # at a non-default path (e.g. a Docker image with its own browser
