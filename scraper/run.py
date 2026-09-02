@@ -31,6 +31,7 @@ from scraper.browser import (
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
 from scraper.overrides import load_overrides
+from scraper.publish import publish_to_mailbox
 from scraper.storage import update_price_history, write_snapshot
 from scraper.unit_price import derive_from_size_and_price
 
@@ -226,6 +227,11 @@ async def main_async(args: argparse.Namespace) -> int:
         _, new_entries = update_price_history(products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
+
+        # Best-effort only, and only after the local files above are already
+        # written - those are the real record regardless of whether this
+        # succeeds. Never runs during a dry run.
+        publish_to_mailbox(products)
 
     return 0
 

@@ -56,6 +56,32 @@ This does everything the dry run does, plus:
 The `data/` folder is not committed to this repository (see `.gitignore`)
 — it's your local price history, not source code.
 
+## Publishing to the recipe app (optional)
+
+After a `--save` run finishes writing its local files, it can also send
+that run's complete products (ones with both a price and a unit price) to
+a recipe app's mailbox endpoint, so the app's own price book can pick up
+fresh prices automatically.
+
+This is entirely optional and off by default. To turn it on, set two
+environment variables before running with `--save`:
+
+```bash
+export MAILBOX_URL="https://example.com/api/price-mailbox"
+export MAILBOX_TOKEN="your-token-here"
+python -m scraper.run --save
+```
+
+If either `MAILBOX_URL` or `MAILBOX_TOKEN` isn't set, publishing is
+silently skipped with one clear line in the output - not an error.
+
+Sending is always best-effort and never affects the scrape's own success:
+if the mailbox can't be reached, times out, or rejects the request (no
+internet, a wrong token, the app being down), the run still counts as a
+full success. `data/snapshots/` and `data/price_history.json` are written
+first and are always the real record, whether or not this last step
+works. A dry run (no `--save`) never sends anything, ever.
+
 ## Adding a new category to scrape
 
 Open `categories.txt` and add a line with the category page's URL. For example:
