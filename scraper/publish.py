@@ -36,13 +36,15 @@ def publish_to_mailbox(products: list[dict]) -> None:
     Only products with BOTH a price and a unit price are sent (the mailbox
     isn't built to handle partial entries - e.g. "each" items with no unit
     price are left out here, same as they're left out of any per-kg
-    comparison). Each entry sent is:
+    comparison). The request body is:
 
-        {"name": ..., "price": <per-unit price, e.g. 2.29 for "$2.29/kg">, "unit": "kg" | "L" | "each"}
+        {"items": [{"name": ..., "price": <per-unit price, e.g. 2.29 for "$2.29/kg">, "unit": "kg" | "L" | "each"}, ...]}
 
-    Note "price" in the outgoing payload is deliberately the per-unit price
+    Note "price" in each entry is deliberately the per-unit price
     (product["unit_price"]), not the raw shelf price - that's what the
-    mailbox's existing price-book already expects.
+    mailbox's existing price-book already expects. The list is wrapped
+    under "items" because that's the shape the mailbox endpoint itself
+    expects - a bare array is not.
     """
     mailbox_url = os.environ.get(MAILBOX_URL_ENV)
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
@@ -63,7 +65,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
         print("Publishing to the recipe app skipped - no complete products (price + unit price) this run.")
         return
 
-    body = json.dumps(payload).encode("utf-8")
+    body = json.dumps({"items": payload}).encode("utf-8")
     request = urllib.request.Request(
         mailbox_url,
         data=body,
