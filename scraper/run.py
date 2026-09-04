@@ -26,6 +26,7 @@ from datetime import date, datetime, timezone
 from scraper.browser import (
     PageLoadTimeout,
     navigate_and_wait_ready,
+    new_pinned_context,
     parse_categories_file,
     stealth_playwright,
 )
@@ -106,7 +107,10 @@ async def scrape_all(categories_path: str, overrides_path: str, headed: bool) ->
         if chromium_override:
             launch_kwargs["executable_path"] = chromium_override
         browser = await p.chromium.launch(**launch_kwargs)
-        page = await browser.new_page()
+        # Pinned to PAK'nSAVE Petone rather than a plain browser.new_page()
+        # - see new_pinned_context()'s docstring / README.md for why.
+        context = await new_pinned_context(browser)
+        page = await context.new_page()
 
         for i, category_page in enumerate(category_pages, start=1):
             log(f"\n[{i}/{len(category_pages)}] {category_page.category} - {category_page.url}")

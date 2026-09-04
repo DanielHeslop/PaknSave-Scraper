@@ -19,6 +19,29 @@ reach the real site is a dry run (see below) to confirm real products show
 up correctly. If the table comes back empty, the site's internal structure
 has likely changed and `scraper/extract.py` will need updating to match.
 
+## Which store this scrapes
+
+Every run is pinned to **PAK'nSAVE Petone** (114-124 Jackson Street,
+Petone, Wellington, 5012). Without this, PAK'nSAVE silently defaults a new
+browser session to whatever store its own IP-based geolocation guesses -
+confirmed live, it picked PAK'nSAVE Royal Oak for the machine this was
+built on - so prices would depend on wherever the scraper happens to run
+from, not anything explicit or stable.
+
+The pin works by setting two cookies (`STORE_ID_V2` and `eCom_STORE_ID`,
+holding the store's UUID `98ec3885-ac93-4fcb-807b-59c9055c52c4`) on every
+browser context before it navigates anywhere - see
+`scraper.browser.new_pinned_context()`. This mirrors exactly what
+PAK'nSAVE's own "Select a store to shop from" picker does when a shopper
+manually chooses a store (confirmed by diffing `context.cookies()`
+before/after a real manual selection); no geolocation permission is
+involved, and the store does not appear in the URL.
+
+If this scraper should ever track a different store, change
+`PETONE_STORE_ID` (and the section name/comments around it) in
+`scraper/browser.py` - don't just delete the pin, or prices will silently
+drift back to whatever store IP geolocation guesses next.
+
 ## Installing
 
 You'll need Python 3.10 or newer.

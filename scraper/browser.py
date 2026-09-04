@@ -20,6 +20,26 @@ LAZY_LOAD_SCROLL_PRESSES = 3
 LAZY_LOAD_SCROLL_DELAY_SECONDS = 0.12
 READY_WAIT_TIMEOUT_MS = 8000
 
+# The store every scrape is pinned to: PAK'nSAVE Petone, 114-124 Jackson
+# Street, Petone, Wellington, 5012. See README.md for why.
+#
+# Without this, PAK'nSAVE silently defaults new sessions to whatever store
+# its own IP-based geolocation guesses (confirmed live: it picked PAK'nSAVE
+# Royal Oak for this machine) - so which store's prices you get would
+# depend on where the scraper happens to run from, not anything explicit.
+#
+# How this was determined: manually opened the site's own "Select a store
+# to shop from" picker in a real stealth browser session, searched
+# "Petone", clicked Select, and diffed context.cookies() before/after.
+# The URL did not change and no geolocation permission was requested/used;
+# two cookies changed value to the store's UUID: STORE_ID_V2 (paired with
+# a "|False" suffix) and eCom_STORE_ID (bare UUID). Setting just these two
+# cookies on a brand-new context - no click, no prior session - was then
+# independently verified to reproduce "Your store is PAK'nSAVE Petone" on
+# first page load, which is what new_pinned_context() below does.
+PETONE_STORE_ID = "98ec3885-ac93-4fcb-807b-59c9055c52c4"
+STORE_COOKIE_DOMAIN = "www.paknsave.co.nz"
+
 
 @dataclass
 class CategoryPage:
@@ -97,6 +117,35 @@ def stealth_playwright():
     opens goes through this.
     """
     return Stealth().use_async(async_playwright())
+
+
+async def new_pinned_context(browser):
+    """Create a browser context pinned to PAK'nSAVE Petone (see
+    PETONE_STORE_ID above for how this was determined).
+
+    Sets the two cookies PAK'nSAVE's own store picker sets when a shopper
+    manually selects a store, before any page is loaded, so every page
+    this context navigates to reports "Your store is PAK'nSAVE Petone"
+    from the very first load - not just after some in-page interaction.
+    """
+    context = await browser.new_context()
+    await context.add_cookies(
+        [
+            {
+                "name": "STORE_ID_V2",
+                "value": f"{PETONE_STORE_ID}|False",
+                "domain": STORE_COOKIE_DOMAIN,
+                "path": "/",
+            },
+            {
+                "name": "eCom_STORE_ID",
+                "value": PETONE_STORE_ID,
+                "domain": STORE_COOKIE_DOMAIN,
+                "path": "/",
+            },
+        ]
+    )
+    return context
 
 
 class PageLoadTimeout(Exception):
