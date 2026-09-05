@@ -105,6 +105,72 @@ full success. `data/snapshots/` and `data/price_history.json` are written
 first and are always the real record, whether or not this last step
 works. A dry run (no `--save`) never sends anything, ever.
 
+## Weekly ingredient search
+
+Besides the daily category scrape above, there's a second, separate mode:
+searching PAK'nSAVE by name for specific recipe ingredients, rather than
+only reading fixed category pages.
+
+```bash
+python -m scraper.search_run          # dry run - prints only, saves nothing
+python -m scraper.search_run --save   # writes results for real
+```
+
+**Where the ingredient names come from.** The recipe app (the same one
+`--save` can publish prices to) exposes a read-only list of every
+ingredient name used across its recipes, at
+`https://my-recipe-manager.netlify.app/api/ingredient-list`. Each run fetches
+that list fresh - `scraper/ingredients.py` only ever reads it, never writes
+back. If the list can't be fetched, the run stops there; there's nothing to
+search for without it.
+
+**How matching works.** For each ingredient name, the scraper searches
+`https://www.paknsave.co.nz/shop/search?q=<name>&sf=shopping` (the same
+mechanism, and the same `data-testid` product-tile structure, as the
+category pages `scraper/extract.py` already reads) and takes the top
+result - but only if it's a confident match. `scraper/matching.py` checks
+whether the ingredient name and the top result's product name share at
+least one meaningful word (e.g. "brown sugar, tightly packed" matching
+"Pams Soft Brown Sugar" on "brown" and "sugar"). If nothing shared turns
+up, or there are no results at all, that ingredient is skipped with an
+honest **"no confident match"** - not an error. This is expected and
+normal for ingredients that are imports, homemade items ("store-bought or
+homemade pesto"), or things PAK'nSAVE simply doesn't sell - the run's
+summary lists every skipped ingredient and why.
+
+**Why this runs weekly, not daily.** Recipe ingredient prices don't need
+same-day freshness the way a daily category scrape does, and searching by
+name is one extra page load per ingredient rather than a handful of fixed
+category pages - so this runs weekly instead of being folded into the
+daily job. On top of that, `data/search_cache.json` tracks the date each
+ingredient was last successfully found and skips re-searching anything
+found within the last 7 days (`--stale-days` to change this), so even a
+weekly run only actually searches what's actually gone stale.
+
+**What `--save` does**, in addition to everything the dry run prints:
+- writes a dated snapshot to `data/search_snapshots/`, separate from the
+  daily scrape's `data/snapshots/`,
+- adds new entries to the same `data/price_history.json` the daily scrape
+  updates (a search-found product is still the same product),
+- updates `data/search_cache.json` with today's date for every ingredient
+  matched this run, and
+- best-effort publishes matched products to the recipe app's mailbox, via
+  the same `MAILBOX_URL`/`MAILBOX_TOKEN` publishing step described above.
+
+A dry run never touches `search_cache.json` - only a `--save` run advances
+which ingredients count as "recently found".
+
+**Running it on a schedule.** `run_weekly.sh` wraps `python -m
+scraper.search_run --save` the same way `run_daily.sh` wraps the category
+scrape - logging to a dated file under `logs/` and ending it with a
+`RESULT: ...` line. It's driven by its own cron entry, separate from and
+slower than the daily job:
+
+```
+0 7 * * *   /path/to/run_daily.sh    # every day, 7:00am
+0 8 * * 0   /path/to/run_weekly.sh   # Sundays only, 8:00am
+```
+
 ## Adding a new category to scrape
 
 Open `categories.txt` and add a line with the category page's URL. For example:
