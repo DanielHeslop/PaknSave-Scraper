@@ -38,7 +38,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
     price are left out here, same as they're left out of any per-kg
     comparison). The request body is:
 
-        {"items": [{"name": ..., "price": <per-unit price, e.g. 2.29 for "$2.29/kg">, "unit": "kg" | "L" | "each"}, ...]}
+        {"items": [{"name": ..., "price": <per-unit price, e.g. 2.29 for "$2.29/kg">, "unit": "kg" | "L" | "each", "size": "500g" (omitted if unresolved)}, ...]}
 
     Note "price" in each entry is deliberately the per-unit price
     (product["unit_price"]), not the raw shelf price - that's what the
@@ -56,7 +56,12 @@ def publish_to_mailbox(products: list[dict]) -> None:
         return
 
     payload = [
-        {"name": p["name"], "price": p["unit_price"], "unit": p["unit"]}
+        {
+            "name": p["name"],
+            "price": p["unit_price"],
+            "unit": p["unit"],
+            **({"size": p["size"]} if p.get("size") is not None else {}),
+        }
         for p in products
         if p.get("price") is not None and p.get("unit_price") is not None
     ]
