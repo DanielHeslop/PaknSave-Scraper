@@ -82,9 +82,12 @@ The `data/` folder is not committed to this repository (see `.gitignore`)
 ## Publishing to the recipe app (optional)
 
 After a `--save` run finishes writing its local files, it can also send
-that run's complete products (ones with both a price and a unit price) to
-a recipe app's mailbox endpoint, so the app's own price book can pick up
-fresh prices automatically.
+that run's priced products (anything with a price at all - including
+"each"/pack items with no per-unit price, e.g. a single cucumber or a
+6-pack of frankfurters, sent with `unit: "each"` and their raw pack-size
+string) to a recipe app's mailbox endpoint, so the app's own price book
+can pick up fresh prices automatically. Only products with no price
+whatsoever are left out.
 
 This is entirely optional and off by default. To turn it on, set two
 environment variables before running with `--save`:

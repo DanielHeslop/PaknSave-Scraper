@@ -31,20 +31,26 @@ TIMEOUT_SECONDS = 5
 
 
 def publish_to_mailbox(products: list[dict]) -> None:
-    """Best-effort: send this run's complete products to the recipe app's mailbox.
+    """Best-effort: send this run's priced products to the recipe app's mailbox.
 
-    Only products with BOTH a price and a unit price are sent (the mailbox
-    isn't built to handle partial entries - e.g. "each" items with no unit
-    price are left out here, same as they're left out of any per-kg
-    comparison). The request body is:
+    Any product with a price is sent - both weight/volume items (which have
+    a proper per-unit price, e.g. "$2.29/kg") and "each"/pack items with no
+    per-unit comparison at all (e.g. a single cucumber, a 6-pack of
+    frankfurters). Only products with no price whatsoever are excluded. The
+    request body is:
 
-        {"items": [{"name": ..., "price": <per-unit price, e.g. 2.29 for "$2.29/kg">, "unit": "kg" | "L" | "each", "size": "500g" (omitted if unresolved)}, ...]}
+        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved)}, ...]}
 
-    Note "price" in each entry is deliberately the per-unit price
-    (product["unit_price"]), not the raw shelf price - that's what the
-    mailbox's existing price-book already expects. The list is wrapped
-    under "items" because that's the shape the mailbox endpoint itself
-    expects - a bare array is not.
+    "price" is product["unit_price"] when a real per-unit price is
+    available (weight/volume items). "each"/pack items have no unit_price
+    to rescale from - PAK'nSAVE never displays one for them - so the raw
+    shelf price (product["price"]) is sent instead, unchanged: for a
+    single-item price that already IS the per-unit price, no invented
+    number involved. Their "unit" is forced to "each" for the same reason.
+    "size" is always the raw string PAK'nSAVE shows (e.g. "ea", "6pk",
+    "500g"), passed through as-is - never parsed or reinterpreted. The list
+    is wrapped under "items" because that's the shape the mailbox endpoint
+    itself expects - a bare array is not.
     """
     mailbox_url = os.environ.get(MAILBOX_URL_ENV)
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
@@ -58,16 +64,16 @@ def publish_to_mailbox(products: list[dict]) -> None:
     payload = [
         {
             "name": p["name"],
-            "price": p["unit_price"],
-            "unit": p["unit"],
+            "price": p["unit_price"] if p.get("unit_price") is not None else p["price"],
+            "unit": p["unit"] if p.get("unit") is not None else "each",
             **({"size": p["size"]} if p.get("size") is not None else {}),
         }
         for p in products
-        if p.get("price") is not None and p.get("unit_price") is not None
+        if p.get("price") is not None
     ]
 
     if not payload:
-        print("Publishing to the recipe app skipped - no complete products (price + unit price) this run.")
+        print("Publishing to the recipe app skipped - no priced products this run.")
         return
 
     body = json.dumps({"items": payload}).encode("utf-8")
