@@ -43,7 +43,7 @@ from scraper.browser import (
 from scraper.extract import extract_product, find_product_tiles, is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, IngredientListError, fetch_ingredient_list
 from scraper.matching import is_confident_match, matching_words
-from scraper.overrides import load_overrides
+from scraper.overrides import get_override, load_overrides
 from scraper.publish import publish_to_mailbox
 from scraper.run import apply_override
 from scraper.search_cache import (
@@ -137,7 +137,7 @@ async def search_one_ingredient(
     if not is_confident_match(ingredient_name, product["name"]):
         return None, f"no confident match - top result was {product['name']!r}, no shared wording"
 
-    override = overrides.get(product["product_id"])
+    override = get_override(overrides, product["supermarket"], product["product_id"])
     if override is not None:
         if override.skip:
             return None, f"{product['product_id']} {product['name']} - excluded via overrides.txt"

@@ -32,7 +32,7 @@ from scraper.browser import (
     stealth_playwright,
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
-from scraper.overrides import load_overrides
+from scraper.overrides import get_override, load_overrides
 from scraper.publish import publish_to_mailbox
 from scraper.storage import update_price_history, write_snapshot
 from scraper.unit_price import derive_from_size_and_price
@@ -177,7 +177,7 @@ async def scrape_all(
                     continue
 
                 product = result.product
-                override = overrides.get(product["product_id"])
+                override = get_override(overrides, product["supermarket"], product["product_id"])
                 if override is not None:
                     if override.skip:
                         dropped_reasons.append(f"{product['product_id']} {product['name']} - excluded via overrides.txt")
