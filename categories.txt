@@ -14,6 +14,23 @@
 # here as you confirm the scraper works well against each one.
 
 https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables
+https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/fruit pages=2 category=fruit
 https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/milk/fresh-milk category=milk
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/cheese pages=2 category=cheese
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/eggs category=eggs
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/yoghurt pages=2 category=yoghurt
 https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/chicken--poultry category=chicken
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/beef pages=2 category=beef
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/lamb category=lamb
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/pork--ham category=pork
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/seafood pages=2 category=seafood
 https://www.paknsave.co.nz/shop/category/pantry/breakfast-cereals category=cereal
+https://www.paknsave.co.nz/shop/category/pantry/spices--seasonings pages=3 category=spices
+https://www.paknsave.co.nz/shop/category/pantry/baking-supplies--sugar pages=2 category=baking
+https://www.paknsave.co.nz/shop/category/pantry/pasta-rice--noodles pages=2 category=pasta-rice
+https://www.paknsave.co.nz/shop/category/pantry/canned-foods--packets pages=2 category=canned
+https://www.paknsave.co.nz/shop/category/pantry/oil--vinegar category=oils-vinegar
+https://www.paknsave.co.nz/shop/category/pantry/table-sauces-dressings--condiments pages=2 category=sauces-condiments
+https://www.paknsave.co.nz/shop/category/bakery pages=2 category=bread-bakery
+https://www.paknsave.co.nz/shop/category/frozen/frozen-vegetables category=frozen-vegetables
+https://www.paknsave.co.nz/shop/category/frozen/frozen-pizza--ready-meals pages=2 category=frozen-meals
