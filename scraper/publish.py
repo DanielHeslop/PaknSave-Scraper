@@ -39,7 +39,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
     frankfurters). Only products with no price whatsoever are excluded. The
     request body is:
 
-        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved)}, ...]}
+        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths"}, ...]}
 
     "price" is product["unit_price"] when a real per-unit price is
     available (weight/volume items). "each"/pack items have no unit_price
@@ -67,6 +67,11 @@ def publish_to_mailbox(products: list[dict]) -> None:
             "price": p["unit_price"] if p.get("unit_price") is not None else p["price"],
             "unit": p["unit"] if p.get("unit") is not None else "each",
             **({"size": p["size"]} if p.get("size") is not None else {}),
+            # Defaults to "Pak'nSave" for pre-multi-chain callers/tests that
+            # don't set this field - never invented for a record that
+            # actually came from elsewhere, since every real product dict is
+            # now tagged with its own chain at construction time.
+            "supermarket": p.get("supermarket", "Pak'nSave"),
         }
         for p in products
         if p.get("price") is not None

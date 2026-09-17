@@ -1,0 +1,40 @@
+# List of free-text search terms to sweep against Woolworths NZ's product
+# search endpoint. One term per line. Each line is independent.
+#
+# Unlike categories.txt, Woolworths has no fixed category-page URLs this
+# scraper reads - its search endpoint only works by free-text term
+# (scraper/woolworths_transport.py's search_products()), so this file plays
+# categories.txt's role but as a plain term list instead.
+#
+# Lines starting with # are comments and ignored.
+#
+# These are STARTING terms, picked to cover roughly the same ground as
+# categories.txt's 21 PAK'nSAVE categories - not verified result quality.
+# A broad term like "vegetables" may return mostly junk or miss most of the
+# department from a search-only endpoint (a real department listing isn't
+# exposed the way PAK'nSAVE's category pages are) - expect to tune these
+# once real result quality has been checked, per the first dry run's report.
+
+vegetables
+fruit
+milk
+cheese
+eggs
+yoghurt
+chicken breast
+beef mince
+lamb
+pork
+seafood
+breakfast cereal
+spices
+baking
+pasta
+rice
+canned goods
+cooking oil
+vinegar
+sauces
+bread
+frozen vegetables
+frozen meals

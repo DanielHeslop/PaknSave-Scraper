@@ -147,6 +147,12 @@ async def extract_product(tile: ElementHandle, category: str, scraped_at: str) -
             "unit_price": unit_price,
             "unit": unit,
             "scraped_at": scraped_at,
+            # Every PAK'nSAVE product is constructed here - one literal default
+            # tags the whole chain's output without touching run.py,
+            # search_run.py, or weekly_combined.py, which just pass this dict
+            # through unchanged. Old data/snapshots/*.json files predate this
+            # field and are never rewritten - this only affects new runs.
+            "supermarket": "Pak'nSave",
         }
     )
 
