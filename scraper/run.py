@@ -24,6 +24,7 @@ import sys
 from datetime import date, datetime, timezone
 
 from scraper.browser import (
+    SITES,
     PageLoadTimeout,
     navigate_and_wait_ready,
     new_pinned_context,
@@ -37,6 +38,7 @@ from scraper.storage import update_price_history, write_snapshot
 from scraper.unit_price import derive_from_size_and_price
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_SITE = "paknsave"
 DEFAULT_CATEGORIES_PATH = os.path.join(REPO_ROOT, "categories.txt")
 DEFAULT_OVERRIDES_PATH = os.path.join(REPO_ROOT, "overrides.txt")
 DEFAULT_SNAPSHOTS_DIR = os.path.join(REPO_ROOT, "data", "snapshots")
@@ -48,7 +50,9 @@ def log(message: str) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="PAK'nSAVE price-tracking scraper (read-only).")
+    parser = argparse.ArgumentParser(
+        description="Foodstuffs (PAK'nSAVE / New World) price-tracking scraper (read-only)."
+    )
     parser.add_argument(
         "--save",
         action="store_true",
@@ -59,11 +63,40 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show the browser window instead of running headless. Useful for debugging.",
     )
-    parser.add_argument("--categories", default=DEFAULT_CATEGORIES_PATH)
+    parser.add_argument(
+        "--site",
+        choices=sorted(SITES),
+        default=DEFAULT_SITE,
+        help="Which supermarket chain to scrape (default: paknsave). Same platform, "
+        "different domain/store/categories file - see scraper/browser.py's SITES.",
+    )
+    # --categories and --snapshots-dir default to None here so their
+    # site-specific defaults (categories.txt/data/snapshots for paknsave,
+    # newworld_categories.txt/data/newworld_snapshots for newworld) can be
+    # resolved after --site is known, in resolve_site_defaults() below -
+    # an explicit flag value always overrides the site's default.
+    parser.add_argument("--categories", default=None)
     parser.add_argument("--overrides", default=DEFAULT_OVERRIDES_PATH)
-    parser.add_argument("--snapshots-dir", default=DEFAULT_SNAPSHOTS_DIR)
+    parser.add_argument("--snapshots-dir", default=None)
     parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    return resolve_site_defaults(args)
+
+
+def resolve_site_defaults(args: argparse.Namespace) -> argparse.Namespace:
+    """Fill in --categories/--snapshots-dir from the chosen --site's
+    defaults when the caller didn't pass an explicit value.
+
+    For the default site (paknsave) this always resolves to exactly
+    DEFAULT_CATEGORIES_PATH / DEFAULT_SNAPSHOTS_DIR - the same paths used
+    before --site existed - so the no-flags invocation is unchanged.
+    """
+    site = SITES[args.site]
+    if args.categories is None:
+        args.categories = os.path.join(REPO_ROOT, site.default_categories_file)
+    if args.snapshots_dir is None:
+        args.snapshots_dir = os.path.join(REPO_ROOT, "data", site.default_snapshots_subdir)
+    return args
 
 
 def apply_override(product: dict, override) -> dict:
@@ -77,8 +110,17 @@ def apply_override(product: dict, override) -> dict:
     return product
 
 
-async def scrape_all(categories_path: str, overrides_path: str, headed: bool) -> dict:
-    """Run the full scrape and return a results dict with products and stats."""
+async def scrape_all(
+    categories_path: str, overrides_path: str, headed: bool, site: str = DEFAULT_SITE
+) -> dict:
+    """Run the full scrape and return a results dict with products and stats.
+
+    `site` selects which chain's store to pin to and which supermarket tag
+    to write onto each product (scraper.browser.SITES). Defaults to
+    "paknsave" so every existing caller (search_run.py, weekly_combined.py,
+    and this module's own default) is unaffected.
+    """
+    site_config = SITES[site]
     overrides = load_overrides(overrides_path)
     category_pages = parse_categories_file(categories_path)
 
@@ -107,9 +149,10 @@ async def scrape_all(categories_path: str, overrides_path: str, headed: bool) ->
         if chromium_override:
             launch_kwargs["executable_path"] = chromium_override
         browser = await p.chromium.launch(**launch_kwargs)
-        # Pinned to PAK'nSAVE Petone rather than a plain browser.new_page()
-        # - see new_pinned_context()'s docstring / README.md for why.
-        context = await new_pinned_context(browser)
+        # Pinned to this site's configured store rather than a plain
+        # browser.new_page() - see new_pinned_context()'s docstring /
+        # README.md for why. Defaults to PAK'nSAVE Petone.
+        context = await new_pinned_context(browser, site_config.store_id, site_config.store_cookie_domain)
         page = await context.new_page()
 
         for i, category_page in enumerate(category_pages, start=1):
@@ -125,7 +168,9 @@ async def scrape_all(categories_path: str, overrides_path: str, headed: bool) ->
             log(f"  {len(tiles)} product tile(s) found")
 
             for tile in tiles:
-                result: ExtractResult = await extract_product(tile, category_page.category, scraped_at)
+                result: ExtractResult = await extract_product(
+                    tile, category_page.category, scraped_at, site_config.supermarket
+                )
 
                 if result.drop_reason:
                     dropped_reasons.append(result.drop_reason)
@@ -212,7 +257,7 @@ async def main_async(args: argparse.Namespace) -> int:
         log("(Dry Run Mode - nothing will be written to disk. Pass --save to write results.)")
 
     try:
-        result = await scrape_all(args.categories, args.overrides, args.headed)
+        result = await scrape_all(args.categories, args.overrides, args.headed, args.site)
     except Exception as e:
         # Genuinely unexpected error - stop the run rather than continuing
         # in an unknown state.

@@ -20,8 +20,8 @@ LAZY_LOAD_SCROLL_PRESSES = 3
 LAZY_LOAD_SCROLL_DELAY_SECONDS = 0.12
 READY_WAIT_TIMEOUT_MS = 8000
 
-# The store every scrape is pinned to: PAK'nSAVE Petone, 114-124 Jackson
-# Street, Petone, Wellington, 5012. See README.md for why.
+# The store every PAK'nSAVE scrape is pinned to: PAK'nSAVE Petone, 114-124
+# Jackson Street, Petone, Wellington, 5012. See README.md for why.
 #
 # Without this, PAK'nSAVE silently defaults new sessions to whatever store
 # its own IP-based geolocation guesses (confirmed live: it picked PAK'nSAVE
@@ -39,6 +39,62 @@ READY_WAIT_TIMEOUT_MS = 8000
 # first page load, which is what new_pinned_context() below does.
 PETONE_STORE_ID = "98ec3885-ac93-4fcb-807b-59c9055c52c4"
 STORE_COOKIE_DOMAIN = "www.paknsave.co.nz"
+
+# New World runs on the same shared Foodstuffs storefront as PAK'nSAVE -
+# same STORE_ID_V2 / eCom_STORE_ID cookie-pinning mechanism, same
+# data-testid page structure - confirmed live 2026-09-18 by fetching
+# https://www.newworld.co.nz and diffing context.cookies() after the site's
+# own IP-geolocation default kicked in (it picked "New World Metro Queen
+# St" for this machine, same mechanism that made PAK'nSAVE default to
+# Royal Oak). Store IDs are per-chain even though the cookie mechanism is
+# shared - a PAK'nSAVE store GUID does not select a New World store.
+#
+# PLACEHOLDER STORE - New World Metro Queen St, picked only because it's
+# what this machine's own IP-geolocation default resolved to during Step 0
+# discovery (a well-known, large central-Auckland store) - swap for the
+# actual target branch's GUID once known. To find another branch's GUID:
+# open a stealth browser context against www.newworld.co.nz, use the
+# site's own store picker to select the desired store, then read
+# eCom_STORE_ID out of context.cookies() (same technique used for
+# PETONE_STORE_ID above). No public GetStoreList-style endpoint was found
+# for New World's current (Next.js) storefront - the old CommonApi path
+# 404s and the newer api-prod.newworld.co.nz/v1/edge/store endpoint
+# requires a JWT this scraper doesn't have - so store discovery is
+# manual, the same way PETONE_STORE_ID was originally determined.
+NEWWORLD_PLACEHOLDER_STORE_ID = "60928d93-06fa-4d8f-92a6-8c359e7e846d"
+NEWWORLD_STORE_COOKIE_DOMAIN = "www.newworld.co.nz"
+
+
+@dataclass(frozen=True)
+class Site:
+    """One supermarket chain's site config: which domain to pin a store on,
+    which store GUID to pin it to, what to tag output with, and which
+    categories file / snapshots subdirectory to use by default.
+    """
+
+    supermarket: str
+    store_cookie_domain: str
+    store_id: str
+    default_categories_file: str
+    default_snapshots_subdir: str
+
+
+SITES: dict[str, Site] = {
+    "paknsave": Site(
+        supermarket="Pak'nSave",
+        store_cookie_domain=STORE_COOKIE_DOMAIN,
+        store_id=PETONE_STORE_ID,
+        default_categories_file="categories.txt",
+        default_snapshots_subdir="snapshots",
+    ),
+    "newworld": Site(
+        supermarket="New World",
+        store_cookie_domain=NEWWORLD_STORE_COOKIE_DOMAIN,
+        store_id=NEWWORLD_PLACEHOLDER_STORE_ID,
+        default_categories_file="newworld_categories.txt",
+        default_snapshots_subdir="newworld_snapshots",
+    ),
+}
 
 
 @dataclass
@@ -119,28 +175,32 @@ def stealth_playwright():
     return Stealth().use_async(async_playwright())
 
 
-async def new_pinned_context(browser):
-    """Create a browser context pinned to PAK'nSAVE Petone (see
-    PETONE_STORE_ID above for how this was determined).
+async def new_pinned_context(browser, store_id: str = PETONE_STORE_ID, domain: str = STORE_COOKIE_DOMAIN):
+    """Create a browser context pinned to a specific store on a specific
+    Foodstuffs-platform domain. Defaults to PAK'nSAVE Petone (see
+    PETONE_STORE_ID above for how this was determined) so every existing
+    call site is unaffected.
 
-    Sets the two cookies PAK'nSAVE's own store picker sets when a shopper
+    Sets the two cookies the site's own store picker sets when a shopper
     manually selects a store, before any page is loaded, so every page
-    this context navigates to reports "Your store is PAK'nSAVE Petone"
-    from the very first load - not just after some in-page interaction.
+    this context navigates to reports the pinned store from the very first
+    load - not just after some in-page interaction. Confirmed live for
+    New World too (see NEWWORLD_PLACEHOLDER_STORE_ID above) - same two
+    cookie names, same mechanism, just a different domain/store GUID.
     """
     context = await browser.new_context()
     await context.add_cookies(
         [
             {
                 "name": "STORE_ID_V2",
-                "value": f"{PETONE_STORE_ID}|False",
-                "domain": STORE_COOKIE_DOMAIN,
+                "value": f"{store_id}|False",
+                "domain": domain,
                 "path": "/",
             },
             {
                 "name": "eCom_STORE_ID",
-                "value": PETONE_STORE_ID,
-                "domain": STORE_COOKIE_DOMAIN,
+                "value": store_id,
+                "domain": domain,
                 "path": "/",
             },
         ]

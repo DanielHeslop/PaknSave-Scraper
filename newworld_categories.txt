@@ -1,0 +1,47 @@
+# List of New World category pages to scrape.
+#
+# New World runs on the same shared Foodstuffs storefront as PAK'nSAVE
+# (see scraper/browser.py's SITES / NEWWORLD_PLACEHOLDER_STORE_ID comment)
+# - same data-testid page structure, same /shop/category/... URL scheme.
+# Live-verified 2026-09-18: all 21 paths below (New World's equivalents of
+# categories.txt's 21 departments) returned status 200 with real product
+# tiles (5-69 tiles each) - no path needed to diverge from PAK'nSAVE's.
+#
+# Format - identical to categories.txt:
+#   <url> [pages=N] [category=name]
+#
+# pages=N  - also scrape N-1 more pages using New World's own ?pg= paging
+#            (default 1, i.e. just this page). Page counts here are carried
+#            over unchanged from categories.txt's PAK'nSAVE values -
+#            page 1 of each was live-verified; pages 2+ were not
+#            individually re-verified for New World.
+# category=name - override the category label used in the output
+#            (default: derived from the last part of the URL).
+#
+# Lines starting with # are comments and ignored.
+#
+# PLACEHOLDER STORE: every scrape using this file is currently pinned to
+# New World Metro Queen St (see NEWWORLD_PLACEHOLDER_STORE_ID in
+# scraper/browser.py) - swap for the real target branch once known.
+
+https://www.newworld.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables
+https://www.newworld.co.nz/shop/category/fruit-and-vegetables/fruit pages=2 category=fruit
+https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs/milk/fresh-milk category=milk
+https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs/cheese pages=2 category=cheese
+https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs/eggs category=eggs
+https://www.newworld.co.nz/shop/category/fridge-deli-and-eggs/yoghurt pages=2 category=yoghurt
+https://www.newworld.co.nz/shop/category/meat-poultry-and-seafood/chicken--poultry category=chicken
+https://www.newworld.co.nz/shop/category/meat-poultry-and-seafood/beef pages=2 category=beef
+https://www.newworld.co.nz/shop/category/meat-poultry-and-seafood/lamb category=lamb
+https://www.newworld.co.nz/shop/category/meat-poultry-and-seafood/pork--ham category=pork
+https://www.newworld.co.nz/shop/category/meat-poultry-and-seafood/seafood pages=2 category=seafood
+https://www.newworld.co.nz/shop/category/pantry/breakfast-cereals category=cereal
+https://www.newworld.co.nz/shop/category/pantry/spices--seasonings pages=3 category=spices
+https://www.newworld.co.nz/shop/category/pantry/baking-supplies--sugar pages=2 category=baking
+https://www.newworld.co.nz/shop/category/pantry/pasta-rice--noodles pages=2 category=pasta-rice
+https://www.newworld.co.nz/shop/category/pantry/canned-foods--packets pages=2 category=canned
+https://www.newworld.co.nz/shop/category/pantry/oil--vinegar category=oils-vinegar
+https://www.newworld.co.nz/shop/category/pantry/table-sauces-dressings--condiments pages=2 category=sauces-condiments
+https://www.newworld.co.nz/shop/category/bakery pages=2 category=bread-bakery
+https://www.newworld.co.nz/shop/category/frozen/frozen-vegetables category=frozen-vegetables
+https://www.newworld.co.nz/shop/category/frozen/frozen-pizza--ready-meals pages=2 category=frozen-meals

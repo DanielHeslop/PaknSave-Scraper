@@ -72,12 +72,20 @@ async def _get_product_id(tile: ElementHandle) -> str | None:
         return None
 
 
-async def extract_product(tile: ElementHandle, category: str, scraped_at: str) -> ExtractResult:
+async def extract_product(
+    tile: ElementHandle, category: str, scraped_at: str, supermarket: str = "Pak'nSave"
+) -> ExtractResult:
     """Read one product tile into a dict of raw scraped values.
 
     Returns a dict with keys: product_id, name, size, price, unit_price,
-    unit, category, scraped_at - or a drop_reason if the product could not
-    be read at all.
+    unit, category, scraped_at, supermarket - or a drop_reason if the
+    product could not be read at all.
+
+    `supermarket` defaults to "Pak'nSave" so every existing call site (all
+    of which read PAK'nSAVE pages) is unaffected. New World shares this
+    same extraction code unchanged - confirmed live 2026-09-18 that its
+    product tiles use the identical data-testid structure - so a caller
+    scraping newworld.co.nz just passes supermarket="New World".
     """
     name = ""
     size: str | None = None
@@ -147,12 +155,12 @@ async def extract_product(tile: ElementHandle, category: str, scraped_at: str) -
             "unit_price": unit_price,
             "unit": unit,
             "scraped_at": scraped_at,
-            # Every PAK'nSAVE product is constructed here - one literal default
-            # tags the whole chain's output without touching run.py,
-            # search_run.py, or weekly_combined.py, which just pass this dict
-            # through unchanged. Old data/snapshots/*.json files predate this
-            # field and are never rewritten - this only affects new runs.
-            "supermarket": "Pak'nSave",
+            # Defaults to "Pak'nSave" (see the supermarket param above) so
+            # run.py, search_run.py, and weekly_combined.py - none of which
+            # pass this arg - keep tagging their output exactly as before.
+            # Old data/snapshots/*.json files predate this field and are
+            # never rewritten - this only affects new runs.
+            "supermarket": supermarket,
         }
     )
 
