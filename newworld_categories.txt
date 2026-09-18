@@ -1,7 +1,7 @@
 # List of New World category pages to scrape.
 #
 # New World runs on the same shared Foodstuffs storefront as PAK'nSAVE
-# (see scraper/browser.py's SITES / NEWWORLD_PLACEHOLDER_STORE_ID comment)
+# (see scraper/browser.py's SITES / NEWWORLD_STORE_ID comment)
 # - same data-testid page structure, same /shop/category/... URL scheme.
 # Live-verified 2026-09-18: all 21 paths below (New World's equivalents of
 # categories.txt's 21 departments) returned status 200 with real product
@@ -20,9 +20,9 @@
 #
 # Lines starting with # are comments and ignored.
 #
-# PLACEHOLDER STORE: every scrape using this file is currently pinned to
-# New World Metro Queen St (see NEWWORLD_PLACEHOLDER_STORE_ID in
-# scraper/browser.py) - swap for the real target branch once known.
+# New World Island Bay, Wellington - confirmed via manual store-picker
+# selection + cookie diff on 2026-09-18 (see NEWWORLD_STORE_ID in
+# scraper/browser.py). Every scrape using this file is pinned to this store.
 
 https://www.newworld.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables
 https://www.newworld.co.nz/shop/category/fruit-and-vegetables/fruit pages=2 category=fruit

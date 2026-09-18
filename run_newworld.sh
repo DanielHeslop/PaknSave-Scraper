@@ -8,10 +8,8 @@
 # Wednesday, so the Pi isn't making more than one chain's worth of
 # requests on the same day from the same IP.
 #
-# NOTE: as of this scrape's addition, newworld_categories.txt pins a
-# PLACEHOLDER store (New World Metro Queen St) - see the comment above
-# NEWWORLD_PLACEHOLDER_STORE_ID in scraper/browser.py. Swap it for the
-# real target branch once known.
+# newworld_categories.txt pins New World Island Bay, Wellington - see the
+# comment above NEWWORLD_STORE_ID in scraper/browser.py.
 #
 # - Runs the scraper with --save --site newworld.
 # - Writes all output (stdout + stderr) to a dated log file under logs/.

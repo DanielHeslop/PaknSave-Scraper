@@ -49,19 +49,26 @@ STORE_COOKIE_DOMAIN = "www.paknsave.co.nz"
 # Royal Oak). Store IDs are per-chain even though the cookie mechanism is
 # shared - a PAK'nSAVE store GUID does not select a New World store.
 #
-# PLACEHOLDER STORE - New World Metro Queen St, picked only because it's
-# what this machine's own IP-geolocation default resolved to during Step 0
-# discovery (a well-known, large central-Auckland store) - swap for the
-# actual target branch's GUID once known. To find another branch's GUID:
-# open a stealth browser context against www.newworld.co.nz, use the
-# site's own store picker to select the desired store, then read
-# eCom_STORE_ID out of context.cookies() (same technique used for
-# PETONE_STORE_ID above). No public GetStoreList-style endpoint was found
-# for New World's current (Next.js) storefront - the old CommonApi path
-# 404s and the newer api-prod.newworld.co.nz/v1/edge/store endpoint
-# requires a JWT this scraper doesn't have - so store discovery is
-# manual, the same way PETONE_STORE_ID was originally determined.
-NEWWORLD_PLACEHOLDER_STORE_ID = "60928d93-06fa-4d8f-92a6-8c359e7e846d"
+# New World Island Bay, 6 Medway Street, Island Bay, Wellington, 6023 -
+# confirmed via manual store-picker selection + cookie diff on 2026-09-18.
+# No public GetStoreList-style endpoint was found for New World's current
+# (Next.js) storefront - the old CommonApi path 404s and the newer
+# api-prod.newworld.co.nz/v1/edge/store endpoint requires a JWT this
+# scraper doesn't have - so, same as PETONE_STORE_ID above, this GUID was
+# found manually: opened a stealth browser context against
+# www.newworld.co.nz, clicked the header's "choose-store" button then its
+# "Change store" tooltip button (which navigates to
+# /shop/fulfillment?from=%2F - the site's own "Collect from" store
+# picker), searched "Island Bay" in the "Search by store name, city or
+# town/suburb" box, clicked "Select" on the "New World Island Bay, 6
+# Medway Street, Island Bay, Wellington, 6023" result, and diffed
+# context.cookies() before/after. The header's own store-name element
+# (data-testid="choose-store") updated to "New World Island Bay" as
+# on-page confirmation the selection took. Setting just these two cookies
+# on a brand-new context - no click, no prior session - was then
+# independently verified to reproduce "New World Island Bay" as the
+# header's store name on first page load.
+NEWWORLD_STORE_ID = "d4408e0f-5268-42c2-ba76-2bc9732d4316"
 NEWWORLD_STORE_COOKIE_DOMAIN = "www.newworld.co.nz"
 
 
@@ -90,7 +97,7 @@ SITES: dict[str, Site] = {
     "newworld": Site(
         supermarket="New World",
         store_cookie_domain=NEWWORLD_STORE_COOKIE_DOMAIN,
-        store_id=NEWWORLD_PLACEHOLDER_STORE_ID,
+        store_id=NEWWORLD_STORE_ID,
         default_categories_file="newworld_categories.txt",
         default_snapshots_subdir="newworld_snapshots",
     ),
@@ -185,7 +192,7 @@ async def new_pinned_context(browser, store_id: str = PETONE_STORE_ID, domain: s
     manually selects a store, before any page is loaded, so every page
     this context navigates to reports the pinned store from the very first
     load - not just after some in-page interaction. Confirmed live for
-    New World too (see NEWWORLD_PLACEHOLDER_STORE_ID above) - same two
+    New World too (see NEWWORLD_STORE_ID above) - same two
     cookie names, same mechanism, just a different domain/store GUID.
     """
     context = await browser.new_context()
