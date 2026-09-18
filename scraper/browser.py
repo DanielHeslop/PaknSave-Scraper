@@ -14,7 +14,17 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
-GOTO_TIMEOUT_MS = 8000
+# Real observed page.goto() load times for the heaviest (pages=2) category
+# pages - measured live 2026-09-18 on this Pi: New World vegetables 21.0s,
+# New World cheese 19.1s, Pak'nSave vegetables 15.2s, Pak'nSave cheese
+# 15.3s. The old 8000ms budget was well under all four, which is why
+# these categories were being silently skipped on every run across all
+# three chains, not just New World. 35000ms gives ~14s (67%) of headroom
+# over the slowest measured page (New World vegetables, 21.0s) without
+# turning a genuinely dead page into an unbounded hang - a real timeout
+# still fires and the existing retry-skip fallback (MAX_LOAD_ATTEMPTS
+# below) still lets the run continue past it.
+GOTO_TIMEOUT_MS = 35000
 MAX_LOAD_ATTEMPTS = 3
 LAZY_LOAD_SCROLL_PRESSES = 3
 LAZY_LOAD_SCROLL_DELAY_SECONDS = 0.12
