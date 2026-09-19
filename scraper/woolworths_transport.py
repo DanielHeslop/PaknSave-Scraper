@@ -56,6 +56,31 @@ BASE_BACKOFF_SECONDS = 1.0
 
 SUPERMARKET_LABEL = "Woolworths"
 
+# Department/category labels Woolworths' own search endpoint bakes into the
+# front of a product's `name` field (confirmed live 2026-09-19, e.g. "fresh
+# vegetable red onion (ea)", "fresh fruit bananas yellow loose") - noise from
+# Woolworths' own naming, not real product identity. Only a genuine leading
+# prefix (this text followed by a space) is stripped; a name that merely
+# contains one of these phrases elsewhere (e.g. "woolworths fresh vegetable
+# beans green", "the odd bunch fresh vegetable carrots" - both seen live) is
+# left untouched, as is an unrelated name that happens to start similarly
+# (e.g. "fresh n fruity yoghurt", a real brand name - "fresh n" is not
+# "fresh fruit " so it doesn't match).
+_NAME_PREFIXES_TO_STRIP = ["fresh vegetable", "fresh vegetables", "fresh fruit", "fresh fruits"]
+
+
+def _strip_department_prefix(name: str) -> str:
+    """Strip a known leading department-label prefix from a product name.
+
+    Case-insensitive match, but the returned text preserves the original
+    casing of whatever follows the prefix. A no-op if no prefix matches.
+    """
+    lowered = name.lower()
+    for prefix in _NAME_PREFIXES_TO_STRIP:
+        if lowered.startswith(prefix + " "):
+            return name[len(prefix):].lstrip()
+    return name
+
 
 class BotDetected(Exception):
     """Raised on a 403/429 response - a hard stop, never retried or routed around."""
@@ -143,6 +168,7 @@ def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | 
     name = item.get("name")
     if not sku or not name:
         return None, f"{item.get('name') or '(unnamed)'} - missing sku or name (likely a non-product entry)"
+    name = _strip_department_prefix(name)
 
     price_block = item.get("price") or {}
     price = price_block.get("salePrice")
