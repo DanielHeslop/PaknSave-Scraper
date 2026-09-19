@@ -39,7 +39,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
     frankfurters). Only products with no price whatsoever are excluded. The
     request body is:
 
-        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths"}, ...]}
+        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths" | "New World", "product_id": the same stable per-chain ID already stored in snapshots/price_history for this item (Pak'nSave/New World: "P#######"; Woolworths: numeric sku as a string)}, ...]}
 
     "price" is product["unit_price"] when a real per-unit price is
     available (weight/volume items). "each"/pack items have no unit_price
@@ -72,6 +72,11 @@ def publish_to_mailbox(products: list[dict]) -> None:
             # actually came from elsewhere, since every real product dict is
             # now tagged with its own chain at construction time.
             "supermarket": p.get("supermarket", "Pak'nSave"),
+            # Same stable ID already keyed into snapshots/price_history for
+            # this item (see storage.py) - lets the receiving app dedupe by
+            # (supermarket, product_id) instead of by name, which breaks
+            # whenever a name-cleanup fix changes a product's stored name.
+            "product_id": p["product_id"],
         }
         for p in products
         if p.get("price") is not None
