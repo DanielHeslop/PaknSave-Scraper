@@ -29,6 +29,42 @@ MAILBOX_URL_ENV = "MAILBOX_URL"
 MAILBOX_TOKEN_ENV = "MAILBOX_TOKEN"
 TIMEOUT_SECONDS = 5
 
+# Human-readable form of this repo's own "unit" values (see extract.py /
+# unit_price.py - "kg", "L", "each" are the only three this repo ever
+# produces, identically for Pak'nSave, Woolworths, and New World; verified
+# 2026-09-30 against real snapshots for all three chains). Mirrors the
+# mapping the receiving app is expected to apply for display (e.g. "(per
+# kg)" instead of "(kg)") - kept here too, under one name, so a future
+# consumer of this field can use the exact same table rather than
+# reinventing it. Anything not covered here (e.g. a raw "100g"-style unit,
+# which this repo never actually emits in "unit" but might one day) is
+# returned unchanged rather than guessed at.
+_UNIT_LABELS = {
+    "kg": "per kg",
+    "per kg": "per kg",
+    "/kg": "per kg",
+    "kilo": "per kg",
+    "l": "per L",
+    "per l": "per L",
+    "litre": "per L",
+    "liter": "per L",
+    "ea": "ea",
+    "each": "ea",
+    "unit": "ea",
+}
+
+
+def map_unit_label(unit: str | None) -> str | None:
+    """Map a raw unit string to its human-readable display form.
+
+    "kg" -> "per kg", "L" -> "per L", "each"/"ea" -> "ea". Matching is
+    case-insensitive. None, "", or anything not in the table above (e.g. a
+    "per 100g"-style unit) is returned unchanged - never guessed at.
+    """
+    if not unit:
+        return unit
+    return _UNIT_LABELS.get(unit.strip().lower(), unit)
+
 
 def publish_to_mailbox(products: list[dict]) -> None:
     """Best-effort: send this run's priced products to the recipe app's mailbox.
@@ -39,7 +75,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
     frankfurters). Only products with no price whatsoever are excluded. The
     request body is:
 
-        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths" | "New World", "product_id": the same stable per-chain ID already stored in snapshots/price_history for this item (Pak'nSave/New World: "P#######"; Woolworths: numeric sku as a string)}, ...]}
+        {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "unit_label": "per kg" | "per L" | "ea" (map_unit_label() applied to "unit" - a purely additive, human-readable form; "unit" itself is untouched so nothing that already parses "unit" is affected), "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths" | "New World", "product_id": the same stable per-chain ID already stored in snapshots/price_history for this item (Pak'nSave/New World: "P#######"; Woolworths: numeric sku as a string)}, ...]}
 
     "price" is product["unit_price"] when a real per-unit price is
     available (weight/volume items). "each"/pack items have no unit_price
@@ -51,6 +87,23 @@ def publish_to_mailbox(products: list[dict]) -> None:
     "500g"), passed through as-is - never parsed or reinterpreted. The list
     is wrapped under "items" because that's the shape the mailbox endpoint
     itself expects - a bare array is not.
+
+    "unit_label" (added 2026-09-30): investigating why New World mailbox
+    items were showing "(kg)"/"(L)" suffixes in the app instead of "(per
+    kg)"/"(per L)" like the other two chains, real snapshot data confirmed
+    this repo's own "unit" field is the bare literal "kg"/"L"/"each" for
+    ALL THREE chains identically - Pak'nSave and New World are byte-for-byte
+    the same shape for the same products (e.g. loose veg: size="kg",
+    unit="kg" for both). So whatever displays Pak'nSave/Woolworths correctly
+    today does not do so by reading "unit" verbatim, and the actual
+    display-suffix logic lives entirely in the recipe app's own code (not in
+    this repo, not available to inspect from here). "unit_label" is added
+    as a new, purely additive field - "unit" is left completely unchanged
+    for every chain - so the app can adopt it for display without any risk
+    to whatever already reads "unit" for calculation. This does NOT, by
+    itself, fix the reported display bug; that requires a corresponding
+    change in the app to consume "unit_label" (or fix its own per-chain
+    branching) - flagged explicitly since it could not be verified here.
     """
     mailbox_url = os.environ.get(MAILBOX_URL_ENV)
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
@@ -66,6 +119,7 @@ def publish_to_mailbox(products: list[dict]) -> None:
             "name": p["name"],
             "price": p["unit_price"] if p.get("unit_price") is not None else p["price"],
             "unit": p["unit"] if p.get("unit") is not None else "each",
+            "unit_label": map_unit_label(p["unit"] if p.get("unit") is not None else "each"),
             **({"size": p["size"]} if p.get("size") is not None else {}),
             # Defaults to "Pak'nSave" for pre-multi-chain callers/tests that
             # don't set this field - never invented for a record that

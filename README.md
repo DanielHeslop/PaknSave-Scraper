@@ -89,6 +89,11 @@ string) to a recipe app's mailbox endpoint, so the app's own price book
 can pick up fresh prices automatically. Only products with no price
 whatsoever are left out.
 
+Each item also carries a `unit_label` field - `map_unit_label()` in
+`scraper/publish.py` applied to `unit` (e.g. `"kg"` -> `"per kg"`, `"each"`
+-> `"ea"`) - a purely additive, human-readable form for display, added
+identically across all three chains. `unit` itself is unchanged.
+
 This is entirely optional and off by default. To turn it on, set two
 environment variables before running with `--save`:
 
