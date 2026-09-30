@@ -12,6 +12,7 @@ the app to use for display, without changing "unit" itself for any chain.
 from __future__ import annotations
 
 import json
+import urllib.error
 
 from scraper.publish import map_unit_label, publish_to_mailbox
 
@@ -138,6 +139,191 @@ def test_each_item_unit_label_is_ea(monkeypatch):
     item = body["items"][0]
     assert item["unit"] == "each"
     assert item["unit_label"] == "ea"
+
+
+# --- scrape-exclusions filtering ---------------------------------------
+#
+# These use a MAILBOX_URL that actually ends in "price-mailbox" (unlike the
+# tests above, which use "https://example.com/mailbox" and so never trigger
+# a real exclusions lookup at all - see _exclusions_url()) so the derived
+# exclusions URL ("https://example.com/api/scrape-exclusions") is exercised.
+
+_TWO_PRODUCTS = [
+    {
+        "product_id": "P100",
+        "name": "Keep Me",
+        "size": "ea",
+        "price": 2.00,
+        "unit_price": None,
+        "unit": "each",
+        "supermarket": "New World",
+    },
+    {
+        "product_id": "P200",
+        "name": "Exclude Me",
+        "size": "ea",
+        "price": 3.00,
+        "unit_price": None,
+        "unit": "each",
+        "supermarket": "New World",
+    },
+]
+
+
+class _FakeResponse:
+    def __init__(self, status=200, body=b""):
+        self.status = status
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self):
+        return self._body
+
+
+def _run_publish(
+    monkeypatch,
+    products,
+    excluded_keys=None,
+    get_raises=None,
+    get_body_override=None,
+    dry_run=False,
+):
+    """Run publish_to_mailbox with a fake transport for both the GET
+    (scrape-exclusions) and POST (mailbox) requests, returning
+    (post_calls, printed_output).
+
+    excluded_keys: list of keys the fake exclusions endpoint returns.
+    get_raises: an exception instance the GET call should raise instead.
+    get_body_override: raw bytes to return from the GET call instead of the
+    normal {"excluded": [...]} shape (for malformed-response tests).
+    """
+    monkeypatch.setenv("MAILBOX_URL", "https://example.com/api/price-mailbox")
+    monkeypatch.setenv("MAILBOX_TOKEN", "test-token")
+    monkeypatch.delenv("EXCLUSIONS_URL", raising=False)
+
+    post_calls = []
+
+    if get_body_override is not None:
+        get_body = get_body_override
+    else:
+        get_body = json.dumps(
+            {"excluded": [{"key": k, "name": k, "at": "2026-10-01"} for k in (excluded_keys or [])]}
+        ).encode("utf-8")
+
+    def _fake_urlopen(request, timeout=None):
+        if request.get_method() == "GET":
+            assert request.get_full_url() == "https://example.com/api/scrape-exclusions"
+            assert request.get_header("Authorization") == "Bearer test-token"
+            if get_raises is not None:
+                raise get_raises
+            return _FakeResponse(body=get_body)
+        post_calls.append(json.loads(request.data.decode("utf-8")))
+        return _FakeResponse()
+
+    monkeypatch.setattr("scraper.publish.urllib.request.urlopen", _fake_urlopen)
+
+    from scraper.publish import publish_to_mailbox as _publish
+
+    _publish(products, dry_run=dry_run)
+    return post_calls
+
+
+def test_exclusions_removes_matching_keys(monkeypatch, capsys):
+    post_calls = _run_publish(monkeypatch, _TWO_PRODUCTS, excluded_keys=["New World|P200"])
+    assert len(post_calls) == 1
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P100"}
+    assert "Excluded 1 of 2 items per scrape-exclusions list" in capsys.readouterr().out
+
+
+def test_exclusions_keeps_non_matching(monkeypatch, capsys):
+    post_calls = _run_publish(monkeypatch, _TWO_PRODUCTS, excluded_keys=["Woolworths|P200"])
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P100", "P200"}
+    assert "Excluded 0 of 2 items per scrape-exclusions list" in capsys.readouterr().out
+
+
+def test_exclusions_list_empty(monkeypatch, capsys):
+    post_calls = _run_publish(monkeypatch, _TWO_PRODUCTS, excluded_keys=[])
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P100", "P200"}
+    assert "Excluded 0 of 2 items per scrape-exclusions list" in capsys.readouterr().out
+
+
+def test_exclusions_fetch_failure_publishes_everything(monkeypatch, capsys):
+    post_calls = _run_publish(
+        monkeypatch, _TWO_PRODUCTS, get_raises=urllib.error.URLError("no network")
+    )
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P100", "P200"}
+    out = capsys.readouterr().out
+    assert "publishing everything" in out.lower()
+
+
+def test_exclusions_bad_json_publishes_everything(monkeypatch, capsys):
+    post_calls = _run_publish(monkeypatch, _TWO_PRODUCTS, get_body_override=b"not json{{{")
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P100", "P200"}
+    out = capsys.readouterr().out
+    assert "publishing everything" in out.lower()
+
+
+def test_exclusions_key_match_is_exact_not_prefix(monkeypatch, capsys):
+    """A product_id that is a prefix of an excluded key's product_id (or
+    vice versa) must not be treated as a match."""
+    products = [
+        {
+            "product_id": "P10",
+            "name": "Short Id",
+            "size": "ea",
+            "price": 1.00,
+            "unit_price": None,
+            "unit": "each",
+            "supermarket": "New World",
+        },
+        {
+            "product_id": "P100",
+            "name": "Longer Id",
+            "size": "ea",
+            "price": 1.00,
+            "unit_price": None,
+            "unit": "each",
+            "supermarket": "New World",
+        },
+    ]
+    # Excludes only the longer id - "New World|P10" must not also match
+    # "New World|P100" via a substring/prefix comparison.
+    post_calls = _run_publish(monkeypatch, products, excluded_keys=["New World|P100"])
+    ids = {item["product_id"] for item in post_calls[0]["items"]}
+    assert ids == {"P10"}
+
+
+def test_dry_run_does_not_post_reports_would_exclude(monkeypatch, capsys):
+    post_calls = _run_publish(
+        monkeypatch, _TWO_PRODUCTS, excluded_keys=["New World|P200"], dry_run=True
+    )
+    assert post_calls == []
+    out = capsys.readouterr().out
+    assert "Excluded 1 of 2 items per scrape-exclusions list" in out
+    assert "Dry run: would send 1 prices to the app." in out
+
+
+def test_no_token_in_log_output_on_any_path(monkeypatch, capsys):
+    token = "test-token"
+    for kwargs in (
+        {"excluded_keys": ["New World|P200"]},
+        {"get_raises": urllib.error.URLError("no network")},
+        {"get_body_override": b"not json{{{"},
+        {"excluded_keys": [], "dry_run": True},
+    ):
+        _run_publish(monkeypatch, _TWO_PRODUCTS, **kwargs)
+        out = capsys.readouterr().out
+        assert token not in out
 
 
 if __name__ == "__main__":

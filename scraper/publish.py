@@ -29,6 +29,15 @@ MAILBOX_URL_ENV = "MAILBOX_URL"
 MAILBOX_TOKEN_ENV = "MAILBOX_TOKEN"
 TIMEOUT_SECONDS = 5
 
+# Optional override for where to fetch the scrape-exclusions list from. When
+# unset, it's derived from MAILBOX_URL by replacing the trailing
+# "price-mailbox" with "scrape-exclusions" (e.g.
+# ".../api/price-mailbox" -> ".../api/scrape-exclusions").
+EXCLUSIONS_URL_ENV = "EXCLUSIONS_URL"
+EXCLUSIONS_TIMEOUT_SECONDS = 15
+_MAILBOX_PATH_SUFFIX = "price-mailbox"
+_EXCLUSIONS_PATH_SUFFIX = "scrape-exclusions"
+
 # Human-readable form of this repo's own "unit" values (see extract.py /
 # unit_price.py - "kg", "L", "each" are the only three this repo ever
 # produces, identically for Pak'nSave, Woolworths, and New World; verified
@@ -66,7 +75,77 @@ def map_unit_label(unit: str | None) -> str | None:
     return _UNIT_LABELS.get(unit.strip().lower(), unit)
 
 
-def publish_to_mailbox(products: list[dict]) -> None:
+def _exclusions_url(mailbox_url: str) -> str | None:
+    """Where to fetch the scrape-exclusions list from.
+
+    EXCLUSIONS_URL_ENV, if set, always wins. Otherwise derived from
+    mailbox_url by replacing its trailing "price-mailbox" with
+    "scrape-exclusions". Returns None if mailbox_url doesn't end that way
+    and no override is set - there's no safe URL to derive in that case.
+    """
+    override = os.environ.get(EXCLUSIONS_URL_ENV)
+    if override:
+        return override
+    if mailbox_url.endswith(_MAILBOX_PATH_SUFFIX):
+        return mailbox_url[: -len(_MAILBOX_PATH_SUFFIX)] + _EXCLUSIONS_PATH_SUFFIX
+    return None
+
+
+def _fetch_excluded_keys(mailbox_url: str, mailbox_token: str) -> set[str] | None:
+    """Fetch the "supermarket|product_id" keys the app wants excluded.
+
+    FAILS OPEN: returns None - meaning "skip filtering, publish everything"
+    - on any problem at all (no derivable URL, network failure, non-2xx
+    response, unreadable/unexpected JSON). This feature must never stop
+    scraping or publishing. Never logs mailbox_token.
+    """
+    url = _exclusions_url(mailbox_url)
+    if url is None:
+        print(
+            "Fetching scrape-exclusions skipped - could not derive its URL from "
+            f"{MAILBOX_URL_ENV} (set {EXCLUSIONS_URL_ENV} to override) - publishing everything."
+        )
+        return None
+
+    request = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {mailbox_token}"},
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=EXCLUSIONS_TIMEOUT_SECONDS) as response:
+            status = response.status
+            body = response.read()
+    except urllib.error.HTTPError as e:
+        print(
+            f"Fetching scrape-exclusions failed: the app responded with status "
+            f"{e.code} ({e.reason}) - publishing everything."
+        )
+        return None
+    except urllib.error.URLError as e:
+        print(f"Fetching scrape-exclusions failed: could not reach {url} ({e.reason}) - publishing everything.")
+        return None
+    except TimeoutError:
+        print(f"Fetching scrape-exclusions failed: timed out after {EXCLUSIONS_TIMEOUT_SECONDS}s - publishing everything.")
+        return None
+    except Exception as e:
+        print(f"Fetching scrape-exclusions failed: unexpected error ({e!r}) - publishing everything.")
+        return None
+
+    if not (200 <= status < 300):
+        print(f"Fetching scrape-exclusions failed: the app responded with status {status} - publishing everything.")
+        return None
+
+    try:
+        data = json.loads(body.decode("utf-8"))
+        return {entry["key"] for entry in data["excluded"]}
+    except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError, AttributeError) as e:
+        print(f"Fetching scrape-exclusions failed: unexpected response shape ({e!r}) - publishing everything.")
+        return None
+
+
+def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
     """Best-effort: send this run's priced products to the recipe app's mailbox.
 
     Any product with a price is sent - both weight/volume items (which have
@@ -104,6 +183,19 @@ def publish_to_mailbox(products: list[dict]) -> None:
     itself, fix the reported display bug; that requires a corresponding
     change in the app to consume "unit_label" (or fix its own per-chain
     branching) - flagged explicitly since it could not be verified here.
+
+    Before sending, the app's scrape-exclusions list (products the user has
+    chosen to stop tracking, fetched from EXCLUSIONS_URL_ENV or a URL
+    derived from MAILBOX_URL - see _exclusions_url()) is fetched and any
+    item whose "<supermarket>|<product_id>" matches an excluded key is
+    dropped from the payload before it's sent, mirroring the app's own
+    keyForMailboxItem convention exactly. Fetching is fail-open: any
+    problem (network, non-200, bad JSON) is logged as a warning and every
+    priced product is published unfiltered, same as before this feature
+    existed.
+
+    dry_run=True fetches the exclusions list and reports what WOULD be
+    excluded/sent, but never POSTs to the mailbox.
     """
     mailbox_url = os.environ.get(MAILBOX_URL_ENV)
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
@@ -138,6 +230,19 @@ def publish_to_mailbox(products: list[dict]) -> None:
 
     if not payload:
         print("Publishing to the recipe app skipped - no priced products this run.")
+        return
+
+    excluded_keys = _fetch_excluded_keys(mailbox_url, mailbox_token)
+    if excluded_keys is not None:
+        before = len(payload)
+        payload = [
+            item for item in payload
+            if f"{item['supermarket']}|{item['product_id']}" not in excluded_keys
+        ]
+        print(f"Excluded {before - len(payload)} of {before} items per scrape-exclusions list")
+
+    if dry_run:
+        print(f"Dry run: would send {len(payload)} prices to the app.")
         return
 
     body = json.dumps({"items": payload}).encode("utf-8")
