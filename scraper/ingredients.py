@@ -9,11 +9,17 @@ recipe app itself (that's publish.py's job, and only for matched results).
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.request
 
 DEFAULT_INGREDIENT_LIST_URL = "https://my-recipe-manager.netlify.app/api/ingredient-list"
 TIMEOUT_SECONDS = 15
+
+# Same env var scraper/publish.py reads its Bearer token from - the app's
+# ingredient-list, price-mailbox, and scrape-exclusions endpoints all accept
+# this one scraper token, so there's only ever one credential to configure.
+MAILBOX_TOKEN_ENV = "MAILBOX_TOKEN"
 
 
 class IngredientListError(Exception):
@@ -27,11 +33,23 @@ class IngredientListError(Exception):
 def fetch_ingredient_list(url: str = DEFAULT_INGREDIENT_LIST_URL) -> list[str]:
     """GET the ingredient list and return it as a plain list of names.
 
+    Sends "Authorization: Bearer <MAILBOX_TOKEN>" when that env var is set -
+    same env var and header scraper/publish.py uses for price-mailbox and
+    scrape-exclusions, since the app expects the same scraper token on all
+    three endpoints. If MAILBOX_TOKEN is unset, the request is sent without
+    an Authorization header, same as before (the app may still allow this
+    endpoint to be read anonymously; if not, the resulting 401 surfaces via
+    IngredientListError same as any other failure).
+
     Raises IngredientListError with a clear reason on any failure (network,
     HTTP status, or unexpected JSON shape) rather than returning a partial
-    or guessed-at list.
+    or guessed-at list. Never logs the token itself.
     """
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    headers = {"Accept": "application/json"}
+    mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
+    if mailbox_token:
+        headers["Authorization"] = f"Bearer {mailbox_token}"
+    request = urllib.request.Request(url, headers=headers)
 
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:

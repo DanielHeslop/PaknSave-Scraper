@@ -25,8 +25,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 from datetime import date
+from pathlib import Path
 
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, IngredientListError, fetch_ingredient_list
 from scraper.matching import is_confident_match, matching_words
@@ -81,7 +83,49 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_STALE_AFTER_DAYS,
         help="Skip re-searching an ingredient found within this many days (default 7).",
     )
+    parser.add_argument(
+        "--publish-snapshot",
+        metavar="PATH",
+        default=None,
+        help="Publish an already-written category snapshot (e.g. "
+        "data/snapshots/2026-10-03.json) to the mailbox without re-scraping, then exit - "
+        "for recovering a run where Part 1's snapshot/history were already written but "
+        "the job failed before publishing (e.g. a Part 2 ingredient-list fetch failure). "
+        "Runs the same publish path and scrape-exclusions filtering as a normal --save "
+        "run. Dry run by default (reports counts only, posts nothing); pass --save too "
+        "to actually publish.",
+    )
     return parser.parse_args(argv)
+
+
+def publish_snapshot_file(path: str, save: bool) -> int:
+    """Load a previously-written snapshot JSON file and publish it to the
+    mailbox (through the same publish_to_mailbox path - and so the same
+    scrape-exclusions filtering - as a normal run), without re-scraping.
+
+    Dry run by default: reports counts only, never POSTs. Pass save=True to
+    actually publish.
+    """
+    snapshot_path = Path(path)
+    try:
+        raw = snapshot_path.read_text()
+    except FileNotFoundError:
+        log(f"Snapshot not found: {snapshot_path}")
+        return 1
+
+    try:
+        products = json.loads(raw)
+    except json.JSONDecodeError as e:
+        log(f"Snapshot at {snapshot_path} is not valid JSON: {e}")
+        return 1
+
+    if not isinstance(products, list):
+        log(f"Snapshot at {snapshot_path} is not a JSON array of products.")
+        return 1
+
+    log(f"Loaded {len(products)} product(s) from {snapshot_path}")
+    publish_to_mailbox(products, dry_run=not save)
+    return 0
 
 
 def split_covered_ingredients(
@@ -132,6 +176,16 @@ async def main_async(args: argparse.Namespace) -> int:
         _, new_entries = update_price_history(category_products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
+
+        # Published here, before Part 2 runs, so a Part 2 failure (e.g. the
+        # ingredient-list fetch) can never cost Part 1's results - see
+        # weekly_combined.py's module docstring history / the 2026-09-27 and
+        # 2026-10-03 incidents where Part 2's 401 caused the whole run to
+        # exit before this ever ran. Safe to call again with the same
+        # products if Part 2 later adds its own publish_to_mailbox call too:
+        # the mailbox key is "supermarket|product_id", so republishing an
+        # unchanged item is just an overwrite with identical data.
+        publish_to_mailbox(category_products)
 
     log("\n" + "=" * 60)
     log("PART 2: INGREDIENT SEARCH (skipping ingredients already covered above)")
@@ -186,17 +240,22 @@ async def main_async(args: argparse.Namespace) -> int:
         save_search_cache(cache, args.cache_path)
         log(f"search_cache.json updated: {len(search_result['newly_found'])} ingredient(s) marked found today.")
 
-        # Best-effort only, same publish path both underlying modules use -
-        # see publish.py's docstring. Both this run's category and search
-        # products go through in one call, exactly as many products as
-        # would be sent across the two separate runs this replaces.
-        publish_to_mailbox(category_products + search_products)
+        # Only the search results here - category_products was already
+        # published right after Part 1 (above), before Part 2 ever ran, so
+        # a Part 2 failure can't lose them. Re-sending category_products
+        # again here would be harmless (mailbox key is
+        # "supermarket|product_id", so a repeat is just an overwrite with
+        # identical data) but pointless, since it was just published.
+        if search_products:
+            publish_to_mailbox(search_products)
 
     return 0
 
 
 def main() -> None:
     args = parse_args()
+    if args.publish_snapshot:
+        sys.exit(publish_snapshot_file(args.publish_snapshot, args.save))
     exit_code = asyncio.run(main_async(args))
     sys.exit(exit_code)
 
