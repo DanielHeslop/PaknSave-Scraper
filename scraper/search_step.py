@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 
 from scraper.ingredients import StoreLists, report_found, report_not_found
-from scraper.matching import _stem, is_local_match
+from scraper.matching import _stem, match_products
 
 SEARCH_TIME_BUDGET_SECONDS = 20 * 60
 
@@ -118,7 +118,7 @@ def local_search(
             log(f"Search step ran out of time - {len(outcome.unsearched)} term(s) not searched.")
             break
         outcome.searched.append(term)
-        matches = [p for p in products if is_local_match(term, p["name"])]
+        matches = match_products(term, products)
         if matches:
             outcome.found[term] = matches
         elif term_has_scraped_home(term, scraped_words):

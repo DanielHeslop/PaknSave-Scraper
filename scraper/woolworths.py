@@ -29,7 +29,7 @@ from pathlib import Path
 
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
-from scraper.matching import is_local_match
+from scraper.matching import match_products
 from scraper.publish import publish_to_mailbox
 from scraper.robots import RobotsDisallowed
 from scraper.search_step import (
@@ -222,7 +222,7 @@ def search_all(
             outcome.unreported.append(term)
             continue
         outcome.searched.append(term)
-        matches = [p for p in results if is_local_match(term, p["name"]) and is_valid_product(p)[0]]
+        matches = match_products(term, [p for p in results if is_valid_product(p)[0]])
         if matches:
             outcome.found[term] = matches
         else:

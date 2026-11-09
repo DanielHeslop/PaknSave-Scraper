@@ -142,7 +142,11 @@ one log line; the old `fetch_ingredient_list` still works.
 **Pak'nSave and New World never use their site search.** Their robots.txt
 disallows `/shop/search`, so terms are matched locally against the products the
 category scrape just collected (`scraper/search_step.py`, `scraper/matching.py`:
-a shared word after simple plural stemming). A term is reported **not found**
+every main word of the term must be in the product name, with plurals and
+spellings like yoghurt/yogurt folded; other forms such as powder, mix, sauce or
+chips, and flavour-only mentions like "garlic & herb chicken", are rejected;
+descriptors like light/dry/frozen are dropped once if nothing matches; single
+generic words like dry/white/light never match alone). A term is reported **not found**
 only if a category that should hold it was scraped this run and nothing matched;
 otherwise it is left unreported. Terms that matched are reported **found**.
 Add `covers=word,word` to a category line to say which words it holds.
