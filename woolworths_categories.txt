@@ -1,0 +1,14 @@
+# Woolworths NZ browse paths, read through the public browse API
+# (/api/v1/products?target=browse). robots.txt allows it; only /shop/search is disallowed.
+#
+# One path per line:  <department>/<aisle>[/<shelf>] [pages=N] [category=label] [covers=a,b,c]
+# pages = max pages of 120 products (default 5). covers = extra words that make a
+# not-found report fair for search terms belonging here. Lines starting with # are comments.
+#
+# Watch categories from the app (same set as the Foodstuffs files):
+pantry/baking category=baking covers=sugar,flour,baking
+pantry/oil-vinegar-condiments category=oil-vinegar-condiments covers=oil,vinegar,sauce,condiment
+pantry/tinned-foods-packets category=tinned-foods-packets covers=tinned,canned,tomato,bean
+pantry/bulk-foods category=bulk-foods covers=bulk,nut,seed
+household/kitchen/kitchen-cleaners category=kitchen-cleaners covers=cleaner,spray
+household/bathroom/toilet-bathroom-cleaners category=bathroom-toilet-cleaners covers=toilet,bleach

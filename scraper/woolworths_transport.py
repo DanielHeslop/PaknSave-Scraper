@@ -258,6 +258,55 @@ def search_products(term: str, size: int = 30) -> tuple[list[dict], list[str]]:
     return products, skip_reasons
 
 
+BROWSE_PAGE_SIZE = 120
+
+
+def browse_url_filters(path: str) -> list[tuple[str, str]]:
+    """'pantry/baking' -> Department + Aisle filters; a third part adds a Shelf."""
+    parts = [p for p in path.strip("/").split("/") if p]
+    if not 1 <= len(parts) <= 3:
+        raise ValueError(f"browse path needs department[/aisle[/shelf]], got {path!r}")
+    return [
+        ("dasFilter", f"{level};;{value};false")
+        for level, value in zip(("Department", "Aisle", "Shelf"), parts)
+    ]
+
+
+def browse_products(path: str, max_pages: int = 5, label: str | None = None) -> tuple[list[dict], list[str], int]:
+    """Read one browse path (department/aisle/shelf) from the public browse API.
+
+    Returns (products, skip_reasons, total_items_reported). Pages of 120 are read
+    until the total is covered or max_pages is hit; every request goes through
+    the throttle and the robots guard.
+    """
+    session = _new_session()
+    fallback = label or path.strip("/").split("/")[-1]
+    products: list[dict] = []
+    skip_reasons: list[str] = []
+    total = 0
+    for page in range(1, max_pages + 1):
+        params = [
+            ("target", "browse"),
+            *browse_url_filters(path),
+            ("inStockProductsOnly", "true"),
+            ("size", str(BROWSE_PAGE_SIZE)),
+            ("page", str(page)),
+        ]
+        data = _get_with_retry(session, BASE_URL, params=params).json()
+        block = data.get("products") or {}
+        items = block.get("items") or []
+        total = block.get("totalItems") or total
+        for item in items:
+            product, reason = _parse_item(item, fallback_category=fallback)
+            if reason is not None:
+                skip_reasons.append(reason)
+            else:
+                products.append(product)
+        if not items or page * BROWSE_PAGE_SIZE >= total:
+            break
+    return products, skip_reasons, total
+
+
 def get_product_by_stock_code(stock_code: str) -> dict | None:
     """Look up a single Woolworths product by its stock code (sku).
 

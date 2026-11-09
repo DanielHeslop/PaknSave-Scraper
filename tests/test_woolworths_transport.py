@@ -48,3 +48,28 @@ def test_similar_but_distinct_leading_text_is_not_stripped():
     # not "fresh fruit ", so this must not be mistaken for the noise prefix.
     name = "fresh n fruity yoghurt greek strawberry"
     assert _strip_department_prefix(name) == name
+
+
+def test_browse_products_pages_until_total_covered(monkeypatch):
+    from scraper import woolworths_transport as t
+
+    calls = []
+
+    class Resp:
+        def __init__(self, items, total):
+            self._d = {"products": {"items": items, "totalItems": total}}
+        def json(self):
+            return self._d
+
+    def item(n):
+        return {"sku": str(n), "name": f"thing {n}", "price": {"salePrice": 1.0}, "size": {}}
+
+    def fake_get(session, url, params=None):
+        calls.append(dict(params) if not isinstance(params, list) else params)
+        page = int(dict(params)["page"])
+        return Resp([item(page)], 200)  # total 200 -> two pages of 120
+
+    monkeypatch.setattr(t, "_get_with_retry", fake_get)
+    products, skipped, total = t.browse_products("pantry/baking", max_pages=5, label="baking")
+    assert [p["product_id"] for p in products] == ["1", "2"] and total == 200 and skipped == []
+    assert len(calls) == 2 and ("dasFilter", "Aisle;;baking;false") in calls[0]
