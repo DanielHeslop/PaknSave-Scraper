@@ -145,7 +145,7 @@ def _fetch_excluded_keys(mailbox_url: str, mailbox_token: str) -> set[str] | Non
         return None
 
 
-def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
+def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> int:
     """Best-effort: send this run's priced products to the recipe app's mailbox.
 
     Any product with a price is sent - both weight/volume items (which have
@@ -196,6 +196,9 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
 
     dry_run=True fetches the exclusions list and reports what WOULD be
     excluded/sent, but never POSTs to the mailbox.
+
+    Returns how many items were actually sent (0 for a dry run, a skipped
+    publish, or any failure).
     """
     mailbox_url = os.environ.get(MAILBOX_URL_ENV)
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
@@ -204,7 +207,7 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
         print(
             "Publishing to the recipe app skipped - MAILBOX_URL/MAILBOX_TOKEN not set."
         )
-        return
+        return 0
 
     payload = [
         {
@@ -230,7 +233,7 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
 
     if not payload:
         print("Publishing to the recipe app skipped - no priced products this run.")
-        return
+        return 0
 
     excluded_keys = _fetch_excluded_keys(mailbox_url, mailbox_token)
     if excluded_keys is not None:
@@ -243,7 +246,7 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
 
     if dry_run:
         print(f"Dry run: would send {len(payload)} prices to the app.")
-        return
+        return 0
 
     body = json.dumps({"items": payload}).encode("utf-8")
     request = urllib.request.Request(
@@ -261,20 +264,21 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> None:
             status = response.status
     except urllib.error.HTTPError as e:
         print(f"Publishing to the recipe app failed: the mailbox responded with status {e.code} ({e.reason}).")
-        return
+        return 0
     except urllib.error.URLError as e:
         print(f"Publishing to the recipe app failed: could not reach {mailbox_url} ({e.reason}).")
-        return
+        return 0
     except TimeoutError:
         print(f"Publishing to the recipe app failed: timed out after {TIMEOUT_SECONDS}s.")
-        return
+        return 0
     except Exception as e:
         # Genuinely unexpected - still non-fatal for the scrape, but worth
         # naming plainly rather than swallowing silently.
         print(f"Publishing to the recipe app failed: unexpected error ({e!r}).")
-        return
+        return 0
 
     if 200 <= status < 300:
         print(f"Sent {len(payload)} prices to the app.")
-    else:
-        print(f"Publishing to the recipe app failed: the mailbox responded with status {status}.")
+        return len(payload)
+    print(f"Publishing to the recipe app failed: the mailbox responded with status {status}.")
+    return 0

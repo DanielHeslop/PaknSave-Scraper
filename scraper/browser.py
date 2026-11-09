@@ -128,6 +128,10 @@ SITES: dict[str, Site] = {
 class CategoryPage:
     url: str
     category: str
+    # Words naming the kinds of products this category holds (from the
+    # optional covers= setting); used to decide which search terms a
+    # category could answer for - see scraper/search_step.py.
+    covers: tuple[str, ...] = ()
 
 
 def parse_categories_file(path: str | Path) -> list[CategoryPage]:
@@ -135,8 +139,9 @@ def parse_categories_file(path: str | Path) -> list[CategoryPage]:
 
     Each non-comment line is a category listing URL plus optional
     'pages=N' (how many paginated pages to also scrape, using PAK'nSAVE's
-    own ?pg= query parameter) and 'category=name' (override the category
-    label used in output). Blank lines and lines starting with # are
+    own ?pg= query parameter), 'category=name' (override the category
+    label used in output) and 'covers=a,b,c' (words for what the category
+    holds, used to decide which search terms it could answer for). Blank lines and lines starting with # are
     ignored.
     """
     pages: list[CategoryPage] = []
@@ -153,6 +158,7 @@ def parse_categories_file(path: str | Path) -> list[CategoryPage]:
         url = parts[0]
         num_pages = 1
         category = _derive_category_from_url(url)
+        covers: tuple[str, ...] = ()
 
         for part in parts[1:]:
             if part.startswith("pages="):
@@ -162,14 +168,16 @@ def parse_categories_file(path: str | Path) -> list[CategoryPage]:
                     num_pages = 1
             elif part.startswith("category="):
                 category = part.split("=", 1)[1]
+            elif part.startswith("covers="):
+                covers = tuple(w for w in part.split("=", 1)[1].lower().split(",") if w)
 
         base_url = url.split("?")[0]
         for page_num in range(1, num_pages + 1):
             if page_num == 1:
-                pages.append(CategoryPage(url=url, category=category))
+                pages.append(CategoryPage(url=url, category=category, covers=covers))
             else:
                 pages.append(
-                    CategoryPage(url=f"{base_url}?pg={page_num}", category=category)
+                    CategoryPage(url=f"{base_url}?pg={page_num}", category=category, covers=covers)
                 )
 
     return pages

@@ -13,24 +13,49 @@
 # Started small on purpose (one category per department) - add more lines
 # here as you confirm the scraper works well against each one.
 
-https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables
-https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/fruit pages=2 category=fruit
-https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/milk/fresh-milk category=milk
-https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/cheese pages=2 category=cheese
-https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/eggs category=eggs
-https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/yoghurt pages=2 category=yoghurt
-https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/chicken--poultry category=chicken
-https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/beef pages=2 category=beef
-https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/lamb category=lamb
-https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/pork--ham category=pork
-https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/seafood pages=2 category=seafood
-https://www.paknsave.co.nz/shop/category/pantry/breakfast-cereals category=cereal
-https://www.paknsave.co.nz/shop/category/pantry/spices--seasonings pages=3 category=spices
-https://www.paknsave.co.nz/shop/category/pantry/baking-supplies--sugar pages=2 category=baking
-https://www.paknsave.co.nz/shop/category/pantry/pasta-rice--noodles pages=2 category=pasta-rice
-https://www.paknsave.co.nz/shop/category/pantry/canned-foods--packets pages=2 category=canned
-https://www.paknsave.co.nz/shop/category/pantry/oil--vinegar category=oils-vinegar
-https://www.paknsave.co.nz/shop/category/pantry/table-sauces-dressings--condiments pages=2 category=sauces-condiments
-https://www.paknsave.co.nz/shop/category/bakery pages=2 category=bread-bakery
-https://www.paknsave.co.nz/shop/category/frozen/frozen-vegetables category=frozen-vegetables
-https://www.paknsave.co.nz/shop/category/frozen/frozen-pizza--ready-meals pages=2 category=frozen-meals
+https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/vegetables pages=2 category=vegetables covers=vegetable,veg,onion,garlic,potato,kumara,carrot,pumpkin,courgette,zucchini,leek,shallot,celery,cabbage,broccoli,cauliflower,spinach,silverbeet,kale,lettuce,cucumber,capsicum,tomato,mushroom,beetroot,parsnip,swede,turnip,eggplant,aubergine,asparagus,corn,beans,peas,ginger,chilli,jalapeno,coriander,parsley,basil,mint,rocket,salad,avocado,fennel,radish,choy,herb
+https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/fruit pages=2 category=fruit covers=fruit,apple,banana,orange,lemon,lime,mandarin,grape,berry,strawberry,blueberry,raspberry,pear,peach,plum,nectarine,apricot,kiwifruit,mango,pineapple,melon,watermelon,feijoa,cherry,grapefruit,passionfruit
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/milk/fresh-milk category=milk covers=milk,buttermilk
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/cheese pages=2 category=cheese covers=cheese,cheddar,mozzarella,parmesan,feta,brie,camembert,ricotta,haloumi,halloumi,gouda,pecorino,mascarpone,gruyere
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/eggs category=eggs covers=egg
+https://www.paknsave.co.nz/shop/category/fridge-deli-and-eggs/yoghurt pages=2 category=yoghurt covers=yoghurt,yogurt
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/chicken--poultry category=chicken covers=chicken,poultry,turkey,duck
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/beef pages=2 category=beef covers=beef,steak,mince,brisket,sirloin,rump,oxtail
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/lamb category=lamb covers=lamb,mutton
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/pork--ham category=pork covers=pork,ham,bacon,sausage,prosciutto,pancetta,chorizo
+https://www.paknsave.co.nz/shop/category/meat-poultry-and-seafood/seafood pages=2 category=seafood covers=seafood,fish,salmon,prawn,shrimp,mussel,snapper,hoki,cod,squid,oyster,crab,anchovy,tuna
+https://www.paknsave.co.nz/shop/category/pantry/breakfast-cereals category=cereal covers=cereal,muesli,granola,oats,oat,porridge,weet,cornflakes
+https://www.paknsave.co.nz/shop/category/pantry/spices--seasonings pages=3 category=spices covers=spice,seasoning,salt,pepper,cumin,paprika,turmeric,cinnamon,nutmeg,clove,allspice,cardamom,coriander,oregano,thyme,rosemary,sage,bay,herb,chilli,curry,garam,masala,saffron,cayenne,fennel,mustard,sumac,rub
+https://www.paknsave.co.nz/shop/category/pantry/baking-supplies--sugar pages=2 category=baking covers=baking,flour,sugar,yeast,cocoa,cornflour,cornstarch,icing,vanilla,essence,soda,gelatine,sprinkles,molasses,treacle,syrup,cornmeal,almond,sultana,raisin,sweetener
+https://www.paknsave.co.nz/shop/category/pantry/pasta-rice--noodles pages=2 category=pasta-rice covers=pasta,rice,noodle,spaghetti,penne,lasagne,macaroni,couscous,quinoa,vermicelli,fettuccine,risoni,orzo,polenta
+https://www.paknsave.co.nz/shop/category/pantry/canned-foods--packets pages=2 category=canned covers=canned,tinned,tin,beans,chickpea,lentil,tomato,tuna,sardine,salmon,coconut,soup,baked,pineapple,passata,corn
+https://www.paknsave.co.nz/shop/category/pantry/oil--vinegar category=oils-vinegar covers=oil,olive,vinegar,balsamic,sesame,canola,sunflower,coconut,ghee
+https://www.paknsave.co.nz/shop/category/pantry/table-sauces-dressings--condiments pages=2 category=sauces-condiments covers=sauce,ketchup,mayonnaise,mustard,dressing,chutney,relish,pickle,gherkin,aioli,salsa,bbq,tomato,sriracha,tabasco,hummus,olive
+https://www.paknsave.co.nz/shop/category/bakery pages=2 category=bread-bakery covers=bread,bun,roll,bagel,wrap,tortilla,pita,focaccia,sourdough,croissant,baguette,brioche,muffin,loaf,crouton,cake,naan
+https://www.paknsave.co.nz/shop/category/frozen/frozen-vegetables category=frozen-vegetables covers=frozen,peas,corn,spinach,broccoli,edamame,beans
+https://www.paknsave.co.nz/shop/category/frozen/frozen-pizza--ready-meals pages=2 category=frozen-meals covers=frozen,pizza,pie,meal,lasagne,dumpling,nugget,fries,pastry
+
+# --- Added for the app's search + watch lists ---
+# Watch categories: bulk foods, kitchen cleaners, bathroom/toilet cleaners.
+# Recipe-term categories: stock and gravy, cooking sauces, herbs, spreads and honey, world foods.
+# Watch-term categories: toilet paper/paper towels, toothpaste, soap, shampoo, conditioner, dishwashing, laundry.
+# Every path below was taken from the site's own ecom_sitemap_categories.xml and checked against robots.txt.
+# covers=  words for what the category holds; a search term is only reported 'not found' if it shares a
+#          word with a category that was scraped this run (see scraper/search_step.py).
+https://www.paknsave.co.nz/shop/category/pantry/bulk-foods category=bulk-foods covers=bulk,nut,seed,fruit,legume,almond,cashew,walnut,pecan,hazelnut,peanut,pistachio,sultana,raisin,date,cranberry,apricot,lentil,chickpea,quinoa,oats,muesli,coconut,sesame,sunflower,flax,chia,scroggin
+https://www.paknsave.co.nz/shop/category/household-and-cleaning/kitchen-cleaners category=kitchen-cleaners covers=kitchen,cleaner,cleaning,spray,sponge,scourer,cloth,dish,brush,glove,oven,bench
+https://www.paknsave.co.nz/shop/category/household-and-cleaning/bathroom--toilet-cleaners category=bathroom-toilet-cleaners covers=bathroom,toilet,cleaner,cleaning,shower,bleach,brush
+https://www.paknsave.co.nz/shop/category/pantry/cooking-sauces-stocks--marinades pages=2 category=cooking-sauces covers=cooking,sauce,stock,gravy,bouillon,marinade,curry,paste,simmer,tomato,puree,worcestershire,soy,hoisin,fish,oyster,teriyaki,sriracha,miso,tamari,sambal,gochujang,passata
+https://www.paknsave.co.nz/shop/category/pantry/cooking-sauces-stocks--marinades/stock--bone-broth category=stock covers=stock,bouillon,cube,broth,bone
+https://www.paknsave.co.nz/shop/category/pantry/cooking-sauces-stocks--marinades/gravy category=gravy covers=gravy
+https://www.paknsave.co.nz/shop/category/pantry/spices-seasoning--coatings/dried-herbs category=herbs covers=herb,basil,oregano,thyme,rosemary,parsley,sage,mint,tarragon,dill,chive,bay,leaf,italian,seasoning,mixed
+https://www.paknsave.co.nz/shop/category/pantry/jams-honey--spreads category=spreads-honey covers=jam,honey,spread,marmalade,peanut,butter,nut,vegemite,marmite,nutella,hazelnut,curd
+https://www.paknsave.co.nz/shop/category/pantry/jams-honey--spreads/honey category=honey covers=honey,manuka
+https://www.paknsave.co.nz/shop/category/pantry/world-foods pages=2 category=world-foods covers=asian,chinese,indian,japanese,korean,mexican,thai,vietnamese,international,world,curry,noodle,tortilla,kimchi,miso,mirin,sake,wasabi,nori,seaweed,sesame,tamarind,wrapper,ramen,udon,soba,sambal,gochujang,harissa,taco,enchilada,jalapeno,chipotle,tamari,tahini,rice
+https://www.paknsave.co.nz/shop/category/household-and-cleaning/toilet-paper-tissues--paper-towels pages=2 category=toilet-paper-towels covers=toilet,paper,tissue,towel,napkin
+https://www.paknsave.co.nz/shop/category/health-and-body/dental--oral-care/toothpaste category=toothpaste covers=toothpaste,tooth,teeth,dental
+https://www.paknsave.co.nz/shop/category/health-and-body/bath-shower--soap category=soap covers=soap,body,wash,hand,shower,gel,bath
+https://www.paknsave.co.nz/shop/category/health-and-body/hair-care/shampoo category=shampoo covers=shampoo,hair
+https://www.paknsave.co.nz/shop/category/health-and-body/hair-care/conditioner category=conditioner covers=conditioner,hair
+https://www.paknsave.co.nz/shop/category/household-and-cleaning/dishwashing category=dishwashing covers=dishwashing,dishwasher,dish,detergent,rinse
+https://www.paknsave.co.nz/shop/category/household-and-cleaning/laundry pages=2 category=laundry covers=laundry,washing,detergent,capsule,softener,fabric,stain,remover,soap,peg

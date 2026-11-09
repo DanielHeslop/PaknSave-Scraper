@@ -1,5 +1,5 @@
-"""Tests for scraper/weekly_combined.py's Part 1 / Part 2 resilience and the
---publish-snapshot recovery path.
+"""Tests for scraper/weekly_combined.py's three steps (scrape, search, publish)
+and the --publish-snapshot recovery path.
 
 Context: on 2026-09-27 and 2026-10-03, Part 2's ingredient-list fetch failed
 with a 401 and the whole run exited before scraper.publish.publish_to_mailbox
@@ -16,7 +16,7 @@ import asyncio
 import json
 
 import scraper.weekly_combined as weekly_combined
-from scraper.ingredients import IngredientListError
+from scraper.ingredients import StoreLists
 from scraper.weekly_combined import main_async, parse_args, publish_snapshot_file
 
 _CATEGORY_PRODUCTS = [
@@ -40,100 +40,106 @@ async def _fake_scrape_all(*args, **kwargs):
         "stats": {
             "pages_scraped": 1,
             "pages_skipped": [],
+            "categories_scraped": 1,
             "products_found": 1,
             "products_saved": 1,
             "products_with_unit_price": 1,
             "products_without_unit_price": 0,
             "products_dropped": [],
         },
+        "scraped_categories": {"vegetables": ("carrot", "onion")},
     }
 
 
 def _base_args(tmp_path, **overrides):
-    argv = ["--save"]
-    args = parse_args(argv)
+    args = parse_args(["--save"])
     args.snapshots_dir = tmp_path / "snapshots"
-    args.search_snapshots_dir = tmp_path / "search_snapshots"
     args.history_path = tmp_path / "price_history.json"
-    args.cache_path = tmp_path / "search_cache.json"
     for key, value in overrides.items():
         setattr(args, key, value)
     return args
 
 
-def test_part1_publishes_before_part2_runs_and_survives_part2_failure(monkeypatch, tmp_path):
-    publish_calls = []
+def _lists(search=("carrots", "saffron", "dry white wine"), watch=("onion",), skip=()):
+    return StoreLists(
+        store="paknsave",
+        search_terms=list(search),
+        watch_terms=list(watch),
+        skip=frozenset(skip),
+    )
 
+
+def _patch(monkeypatch, lists, published, reports):
     monkeypatch.setattr(weekly_combined, "scrape_all", _fake_scrape_all)
+    monkeypatch.setattr(weekly_combined, "fetch_store_lists", lambda store, url: lists)
     monkeypatch.setattr(
-        weekly_combined,
-        "fetch_ingredient_list",
-        lambda url: (_ for _ in ()).throw(IngredientListError("boom: 401")),
+        weekly_combined, "publish_to_mailbox", lambda products, **kw: published.append(products) or len(products)
     )
     monkeypatch.setattr(
-        weekly_combined, "publish_to_mailbox", lambda products, **kw: publish_calls.append(products)
+        weekly_combined, "report_outcome", lambda store, outcome: reports.append((store, outcome))
     )
 
-    args = _base_args(tmp_path)
-    exit_code = asyncio.run(main_async(args))
 
-    assert exit_code == 1
-    assert publish_calls == [_CATEGORY_PRODUCTS]
+def test_search_step_matches_locally_and_reports_found_and_not_found(monkeypatch, tmp_path):
+    published, reports = [], []
+    _patch(monkeypatch, _lists(), published, reports)
+
+    assert asyncio.run(main_async(_base_args(tmp_path))) == 0
+
+    (store, outcome), = reports
+    assert store == "paknsave"
+    assert set(outcome.found) == {"carrots"}
+    # onion belongs to the scraped vegetables category and nothing matched -> not found.
+    assert outcome.not_found == ["onion"]
+    # saffron / dry white wine have no scraped category to blame -> left unreported.
+    assert set(outcome.unreported) == {"saffron", "dry white wine"}
+    assert published == [_CATEGORY_PRODUCTS]
 
 
-def test_part2_failure_is_logged_clearly(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(weekly_combined, "scrape_all", _fake_scrape_all)
+def test_search_step_failure_still_publishes(monkeypatch, tmp_path, capsys):
+    published, reports = [], []
+    _patch(monkeypatch, _lists(), published, reports)
     monkeypatch.setattr(
-        weekly_combined,
-        "fetch_ingredient_list",
-        lambda url: (_ for _ in ()).throw(
-            IngredientListError(f"{url} responded with status 401 (Unauthorized)")
-        ),
+        weekly_combined, "run_search_step", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
     )
-    monkeypatch.setattr(weekly_combined, "publish_to_mailbox", lambda products, **kw: None)
 
-    args = _base_args(tmp_path)
-    exit_code = asyncio.run(main_async(args))
+    assert asyncio.run(main_async(_base_args(tmp_path))) == 0
 
-    assert exit_code == 1
+    assert published == [_CATEGORY_PRODUCTS]
+    assert "Search step failed" in capsys.readouterr().out
+
+
+def test_unreachable_app_list_skips_search_but_publishes(monkeypatch, tmp_path):
+    published, reports = [], []
+    _patch(monkeypatch, None, published, reports)
+
+    assert asyncio.run(main_async(_base_args(tmp_path))) == 0
+
+    assert reports == []
+    assert published == [_CATEGORY_PRODUCTS]
+
+
+def test_dry_run_publishes_and_reports_nothing(monkeypatch, tmp_path, capsys):
+    published, reports = [], []
+    _patch(monkeypatch, _lists(), published, reports)
+    args = _base_args(tmp_path, save=False)
+
+    assert asyncio.run(main_async(args)) == 0
+
+    assert published == [] and reports == []
     out = capsys.readouterr().out
-    assert "Could not fetch the ingredient list - stopping run" in out
-    assert "401" in out
+    assert "would report" in out and "SUMMARY:" in out
 
 
-def test_part1_not_published_twice_when_part2_succeeds_with_no_search_products(monkeypatch, tmp_path):
-    """When Part 2 runs to completion but finds no NEW products to search
-    for (its one ingredient is already covered by the category scrape), it
-    must not re-publish category_products a second time - it was already
-    published right after Part 1, and search_products is empty so Part 2's
-    own `if search_products:` publish guard is skipped entirely."""
-    publish_calls = []
+def test_summary_line_is_printed_last(monkeypatch, tmp_path, capsys):
+    published, reports = [], []
+    _patch(monkeypatch, _lists(skip=["saffron"]), published, reports)
 
-    async def _fake_search_all(*args, **kwargs):
-        return {
-            "products": [],
-            "stats": {
-                "ingredients_total": 0,
-                "ingredients_already_fresh": [],
-                "ingredients_searched": 0,
-                "ingredients_matched": 0,
-                "ingredients_no_match": [],
-            },
-            "newly_found": [],
-        }
+    asyncio.run(main_async(_base_args(tmp_path)))
 
-    monkeypatch.setattr(weekly_combined, "scrape_all", _fake_scrape_all)
-    monkeypatch.setattr(weekly_combined, "fetch_ingredient_list", lambda url: ["Carrots"])
-    monkeypatch.setattr(weekly_combined, "search_all", _fake_search_all)
-    monkeypatch.setattr(
-        weekly_combined, "publish_to_mailbox", lambda products, **kw: publish_calls.append(products)
-    )
-
-    args = _base_args(tmp_path)
-    exit_code = asyncio.run(main_async(args))
-
-    assert exit_code == 0
-    assert publish_calls == [_CATEGORY_PRODUCTS]
+    last = capsys.readouterr().out.strip().splitlines()[-1]
+    assert last.startswith("SUMMARY: products published 1, terms searched 3, found 1, not found 1")
+    assert "skipped 1" in last and "categories scraped 1" in last
 
 
 def test_publish_snapshot_file_dry_run_reports_counts_without_posting(monkeypatch, tmp_path):

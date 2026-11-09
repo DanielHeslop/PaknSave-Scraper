@@ -133,13 +133,15 @@ async def scrape_all(
 
     if not category_pages:
         log(f"No categories found in {categories_path} - nothing to scrape.")
-        return {"products": [], "stats": _empty_stats()}
+        return {"products": [], "stats": _empty_stats(), "scraped_categories": {}}
 
     log(f"{len(category_pages)} page(s) to be scraped.")
 
     products: list[dict] = []
     dropped_reasons: list[str] = []
     skipped_pages: list[str] = []
+    robots_skipped: list[str] = []
+    scraped_categories: dict[str, tuple[str, ...]] = {}  # label -> covers, for categories with a page that loaded
     scraped_at = date.today().isoformat()
 
     # stealth_playwright() (scraper/browser.py) wraps async_playwright() with
@@ -167,6 +169,7 @@ async def scrape_all(
             log(f"\n[{i}/{len(category_pages)}] {category_page.category} - {category_page.url}")
             if not guard.allows(category_page.url):
                 skipped_pages.append(category_page.url)
+                robots_skipped.append(category_page.url)
                 continue
             if loaded_any:
                 await polite_pause()
@@ -178,6 +181,7 @@ async def scrape_all(
                 skipped_pages.append(category_page.url)
                 continue
 
+            scraped_categories.setdefault(category_page.category, category_page.covers)
             tiles = await find_product_tiles(page)
             log(f"  {len(tiles)} product tile(s) found")
 
@@ -210,19 +214,23 @@ async def scrape_all(
     stats = {
         "pages_scraped": len(category_pages) - len(skipped_pages),
         "pages_skipped": skipped_pages,
+        "robots_skipped": robots_skipped,
+        "categories_scraped": len(scraped_categories),
         "products_found": len(products) + len(dropped_reasons),
         "products_saved": len(products),
         "products_with_unit_price": sum(1 for p in products if p["unit_price"] is not None),
         "products_without_unit_price": sum(1 for p in products if p["unit_price"] is None),
         "products_dropped": dropped_reasons,
     }
-    return {"products": products, "stats": stats}
+    return {"products": products, "stats": stats, "scraped_categories": scraped_categories}
 
 
 def _empty_stats() -> dict:
     return {
         "pages_scraped": 0,
         "pages_skipped": [],
+        "robots_skipped": [],
+        "categories_scraped": 0,
         "products_found": 0,
         "products_saved": 0,
         "products_with_unit_price": 0,
@@ -253,7 +261,7 @@ def print_summary(stats: dict) -> None:
     print("RUN SUMMARY")
     print("=" * 60)
     print(f"Pages scraped successfully : {stats['pages_scraped']}")
-    print(f"Pages skipped (load failed): {len(stats['pages_skipped'])}")
+    print(f"Pages skipped (load failed or robots.txt): {len(stats['pages_skipped'])}")
     for url in stats["pages_skipped"]:
         print(f"  - {url}")
     print(f"Products found on pages    : {stats['products_found']}")

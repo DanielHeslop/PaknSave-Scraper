@@ -45,3 +45,27 @@ def is_confident_match(ingredient_name: str, product_name: str) -> bool:
     can never confidently match anything.
     """
     return bool(matching_words(ingredient_name, product_name))
+
+
+def _stem(word: str) -> str:
+    """Crude plural folding so 'leeks' meets 'leek' and 'tomatoes' meets 'tomato'."""
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith(("oes", "ches", "shes", "sses", "xes")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def stemmed_words(text: str) -> set[str]:
+    return {_stem(w) for w in _significant_words(text)}
+
+
+def is_local_match(term: str, product_name: str) -> bool:
+    """Same shared-word test as is_confident_match, with plurals folded.
+
+    Used where the product list is searched locally (no site search to do
+    the stemming for us), so 'courgette' still finds 'Green Courgettes'.
+    """
+    return bool(stemmed_words(term) & stemmed_words(product_name))
