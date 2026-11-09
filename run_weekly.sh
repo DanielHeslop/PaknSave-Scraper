@@ -11,14 +11,23 @@
 #   reading the whole thing.
 set -uo pipefail
 
-export MAILBOX_URL="https://my-recipe-manager.netlify.app/api/price-mailbox"
-export MAILBOX_TOKEN="pns-scrape-7f3k9x2m4q8w1z6v"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 mkdir -p logs
 LOG_FILE="logs/weekly-$(date +%F).log"
+
+# Secrets (MAILBOX_URL, MAILBOX_TOKEN) live outside the repo.
+ENV_FILE="${PAKNSAVE_ENV_FILE:-$HOME/.config/paknsave-scraper/env}"
+if [ ! -r "$ENV_FILE" ]; then
+    echo "RESULT: FAILED - env file $ENV_FILE is missing or unreadable (see env.example)" >>"$LOG_FILE"
+    echo "ERROR: env file $ENV_FILE is missing or unreadable (see env.example in the repo)" >&2
+    exit 1
+fi
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
 
 # Run the search scraper, capturing both stdout and stderr into the log
 # file. set -o pipefail (above) means $? below reflects the scraper's exit
