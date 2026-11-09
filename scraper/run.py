@@ -29,11 +29,13 @@ from scraper.browser import (
     navigate_and_wait_ready,
     new_pinned_context,
     parse_categories_file,
+    polite_pause,
     stealth_playwright,
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
 from scraper.overrides import get_override, load_overrides
 from scraper.publish import publish_to_mailbox
+from scraper.robots import RobotsGuard
 from scraper.storage import update_price_history, write_snapshot
 from scraper.unit_price import derive_from_size_and_price
 
@@ -111,7 +113,11 @@ def apply_override(product: dict, override) -> dict:
 
 
 async def scrape_all(
-    categories_path: str, overrides_path: str, headed: bool, site: str = DEFAULT_SITE
+    categories_path: str,
+    overrides_path: str,
+    headed: bool,
+    site: str = DEFAULT_SITE,
+    guard: RobotsGuard | None = None,
 ) -> dict:
     """Run the full scrape and return a results dict with products and stats.
 
@@ -121,6 +127,7 @@ async def scrape_all(
     and this module's own default) is unaffected.
     """
     site_config = SITES[site]
+    guard = guard or RobotsGuard()
     overrides = load_overrides(overrides_path)
     category_pages = parse_categories_file(categories_path)
 
@@ -155,8 +162,15 @@ async def scrape_all(
         context = await new_pinned_context(browser, site_config.store_id, site_config.store_cookie_domain)
         page = await context.new_page()
 
+        loaded_any = False
         for i, category_page in enumerate(category_pages, start=1):
             log(f"\n[{i}/{len(category_pages)}] {category_page.category} - {category_page.url}")
+            if not guard.allows(category_page.url):
+                skipped_pages.append(category_page.url)
+                continue
+            if loaded_any:
+                await polite_pause()
+            loaded_any = True
             try:
                 await navigate_and_wait_ready(page, category_page.url, log)
             except PageLoadTimeout as e:

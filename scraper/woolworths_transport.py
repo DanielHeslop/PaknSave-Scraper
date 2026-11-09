@@ -45,6 +45,8 @@ from datetime import date
 
 import requests
 
+from scraper.robots import RobotsDisallowed, RobotsGuard
+
 BASE_URL = "https://www.woolworths.co.nz/api/v1/products"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -55,6 +57,22 @@ MAX_RETRIES = 3
 BASE_BACKOFF_SECONDS = 1.0
 
 SUPERMARKET_LABEL = "Woolworths"
+
+# Minimum gap between two requests to Woolworths (any endpoint), plus jitter.
+REQUEST_DELAY_SECONDS = 2.0
+REQUEST_DELAY_JITTER_SECONDS = 1.0
+
+ROBOTS_GUARD = RobotsGuard()
+_last_request_at: float | None = None
+
+
+def _throttle() -> None:
+    global _last_request_at
+    if _last_request_at is not None:
+        wait = _last_request_at + REQUEST_DELAY_SECONDS + random.uniform(0, REQUEST_DELAY_JITTER_SECONDS) - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+    _last_request_at = time.monotonic()
 
 # Department/category labels Woolworths' own search endpoint bakes into the
 # front of a product's `name` field (confirmed live 2026-09-19, e.g. "fresh
@@ -107,9 +125,14 @@ def _get_with_retry(session: requests.Session, url: str, params: dict | None = N
     """GET url, retrying only 5xx/network errors with jittered backoff.
 
     A 403 or 429 raises BotDetected immediately - see module docstring.
+    A URL robots.txt disallows raises RobotsDisallowed before any request.
     """
+    full_url = requests.Request("GET", url, params=params).prepare().url
+    if not ROBOTS_GUARD.allows(full_url):
+        raise RobotsDisallowed(full_url)
     attempt = 0
     while True:
+        _throttle()
         try:
             response = session.get(url, params=params, timeout=TIMEOUT_SECONDS)
         except requests.RequestException as e:

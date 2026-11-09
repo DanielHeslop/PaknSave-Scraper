@@ -7,6 +7,7 @@ It never logs in, adds to a cart, or checks out.
 from __future__ import annotations
 
 import asyncio
+import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,15 @@ MAX_LOAD_ATTEMPTS = 3
 LAZY_LOAD_SCROLL_PRESSES = 3
 LAZY_LOAD_SCROLL_DELAY_SECONDS = 0.12
 READY_WAIT_TIMEOUT_MS = 8000
+
+# Pause between one Foodstuffs page load and the next, on top of the 24-50s
+# each load already takes on the Pi. Jittered so requests don't land on a beat.
+PAGE_DELAY_SECONDS = 4.0
+PAGE_DELAY_JITTER_SECONDS = 2.0
+
+
+async def polite_pause() -> None:
+    await asyncio.sleep(PAGE_DELAY_SECONDS + random.uniform(0, PAGE_DELAY_JITTER_SECONDS))
 
 # The store every PAK'nSAVE scrape is pinned to: PAK'nSAVE Petone, 114-124
 # Jackson Street, Petone, Wellington, 5012. See README.md for why.

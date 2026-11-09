@@ -24,6 +24,7 @@ from pathlib import Path
 
 from scraper.extract import is_valid_product
 from scraper.publish import publish_to_mailbox
+from scraper.robots import RobotsDisallowed
 from scraper.storage import update_price_history, write_snapshot
 from scraper.woolworths_transport import BotDetected, search_products
 
@@ -98,6 +99,9 @@ def scrape_all(terms_path: str, size: int) -> dict:
         log(f"\n[{i}/{len(terms)}] searching: {term!r}")
         try:
             term_products, skip_reasons = search_products(term, size=size)
+        except RobotsDisallowed as e:
+            log(f"  SKIPPED: robots.txt disallows {e}")
+            continue
         except BotDetected as e:
             # Hard stop for this term only - not escalated, not retried with
             # different headers, not routed around. The rest of the run
