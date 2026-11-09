@@ -147,6 +147,23 @@ only if a category that should hold it was scraped this run and nothing matched;
 otherwise it is left unreported. Terms that matched are reported **found**.
 Add `covers=word,word` to a category line to say which words it holds.
 
+**Category coverage (Pak'nSave and New World, identical label sets).** Besides
+the department-level pages, each store file has one narrow category per common
+product type (butter, cream cheese, sour cream, fresh cream, milk powder,
+garlic/ginger, onions, potatoes, carrots, lettuce, citrus, bacon, mince, oats,
+everyday cereal for Weet-Bix, tuna, canned salmon/sardines, mayonnaise, salad
+dressing, pickles, tomato paste, Worcestershire, soy and Asian sauces, cooking
+oil, baking nuts, fruit juice, burger buns). The words that used to sit on a
+broad parent (e.g. `garlic` on vegetables) were moved to the narrow category, so
+a term is "not found" only when the page that should hold it was scraped. Wine
+has no category: bottles are named by brand and grape, so wine terms stay
+unreported. Which term belongs to which category is recorded in
+`tests/fixtures/term_categories.json` and checked by
+`tests/test_category_coverage.py`, which also checks every URL against a saved
+copy of each site's robots.txt (`tests/fixtures/robots_*.txt`). Matching is by
+any shared word, so a generic word on a category (e.g. `cream`) can match
+unrelated products.
+
 **Woolworths** uses its public JSON API: the browse API for the watch categories
 in `woolworths_categories.txt`, and the product-search API for each term (with a
 short delay between requests). robots.txt disallows only `/shop/search` (the HTML

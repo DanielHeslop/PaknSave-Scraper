@@ -1,0 +1,24 @@
+User-agent: *
+Disallow: /*?utm
+Disallow: /email
+Disallow: /search
+Disallow: /Search
+Disallow: /sitecore
+Disallow: /*?store=
+Disallow: /sitecore/
+Disallow: /*?source=
+Disallow: /shop/offer
+Disallow: /shop/search
+Disallow: /shop/Search
+Disallow: /shop/sitecore
+Disallow: /*?alttemplate=
+Disallow: /shop/sitecore/
+Disallow: /shop/my-account/
+Disallow: /*?ShowDesktopSite=
+Disallow: /product-promotions
+
+Disallow: /-/media/Project/Sitecore/Brands/Brand-New-World/Store-catering-PDFs/
+
+Sitemap: https://www.newworld.co.nz/ecomsitemap_index.xml
+Sitemap: https://www.newworld.co.nz/brandssitemap.xml
+Sitemap: https://www.newworld.co.nz/brandssitemap_recipes.xml

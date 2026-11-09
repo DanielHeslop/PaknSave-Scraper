@@ -1,0 +1,18 @@
+User-agent: *
+Disallow: /*?utm
+Disallow: /search
+Disallow: /Search
+Disallow: /sitecore
+Disallow: /*?store=
+Disallow: /*?source=
+Disallow: /sitecore/
+Disallow: /shop/search
+Disallow: /shop/Search
+Disallow: /shop/sitecore
+Disallow: /*?alttemplate=
+Disallow: /shop/sitecore/
+
+Disallow: /*?ShowDesktopSite=
+
+Sitemap: https://www.paknsave.co.nz/ecomsitemap_index.xml
+Sitemap: https://www.paknsave.co.nz/brandssitemap.xml
