@@ -9,7 +9,9 @@
 # run_daily.sh and run_weekly.sh themselves are unchanged and still work if
 # run by hand - only their cron schedule was retired in favour of this.
 #
-# - Runs the combined scraper with --save.
+# - Runs the combined scraper with --save: category scrape (incl. watch
+#   categories), local search step (time-boxed ~20 min), then publish (runs
+#   even if the search step fails).
 # - Writes all output (stdout + stderr) to a dated log file under logs/.
 # - Always appends one final "RESULT: ..." line so a human can check the
 #   last line of any week's log and instantly know success/failure, without

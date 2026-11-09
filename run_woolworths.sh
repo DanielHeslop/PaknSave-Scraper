@@ -6,7 +6,9 @@
 # job (Sunday) so the Pi isn't making two chains' worth of requests
 # back-to-back on the same day from the same IP.
 #
-# - Runs the Woolworths scraper with --save.
+# - Runs the Woolworths scraper with --save: browse watch categories, search
+#   the app's terms through the API (time-boxed ~20 min), then publish (runs
+#   even if the search step fails).
 # - Writes all output (stdout + stderr) to a dated log file under logs/.
 # - Always appends one final "RESULT: ..." line so a human can check the
 #   last line of any week's log and instantly know success/failure, without

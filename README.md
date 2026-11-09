@@ -113,71 +113,61 @@ full success. `data/snapshots/` and `data/price_history.json` are written
 first and are always the real record, whether or not this last step
 works. A dry run (no `--save`) never sends anything, ever.
 
-## Weekly ingredient search
+## Weekly run: categories, search, publish
 
-Besides the daily category scrape above, there's a second, separate mode:
-searching PAK'nSAVE by name for specific recipe ingredients, rather than
-only reading fixed category pages.
+Each chain has one weekly job (cron: Wednesday Woolworths, Friday New World,
+Sunday Pak'nSave, all 8am). Every job does three things in order, and the
+publish step runs even if the search step fails:
+
+1. **Category scrape**, including the "watch" categories (bulk foods, kitchen
+   and bathroom cleaners, stock, gravy, spices, spreads, toothpaste and so on).
+2. **Search step** (time-boxed to about 20 minutes).
+3. **Publish** to the recipe app's mailbox, de-duplicated by product id.
 
 ```bash
-python -m scraper.search_run          # dry run - prints only, saves nothing
-python -m scraper.search_run --save   # writes results for real
+python -m scraper.weekly_combined                    # Pak'nSave, dry run
+python -m scraper.weekly_combined --site newworld    # New World, dry run
+python -m scraper.woolworths                         # Woolworths, dry run
+# add --save to write, publish and report for real
 ```
 
-**Where the ingredient names come from.** The recipe app (the same one
-`--save` can publish prices to) exposes a read-only list of every
-ingredient name used across its recipes, at
-`https://my-recipe-manager.netlify.app/api/ingredient-list`. Each run fetches
-that list fresh - `scraper/ingredients.py` only ever reads it, never writes
-back. If the list can't be fetched, the run stops there; there's nothing to
-search for without it.
+`python -m scraper.search_run` is the same job as `weekly_combined`.
 
-**How matching works.** For each ingredient name, the scraper searches
-`https://www.paknsave.co.nz/shop/search?q=<name>&sf=shopping` (the same
-mechanism, and the same `data-testid` product-tile structure, as the
-category pages `scraper/extract.py` already reads) and takes the top
-result - but only if it's a confident match. `scraper/matching.py` checks
-whether the ingredient name and the top result's product name share at
-least one meaningful word (e.g. "brown sugar, tightly packed" matching
-"Pams Soft Brown Sugar" on "brown" and "sugar"). If nothing shared turns
-up, or there are no results at all, that ingredient is skipped with an
-honest **"no confident match"** - not an error. This is expected and
-normal for ingredients that are imports, homemade items ("store-bought or
-homemade pesto"), or things PAK'nSAVE simply doesn't sell - the run's
-summary lists every skipped ingredient and why.
+**What to search for.** `scraper/ingredients.py` asks the app for the store's
+list (`GET ?store=paknsave|newworld|woolworths`, Bearer token): search terms,
+watch terms, watch categories and a skip list. Skipped terms are not searched
+(watch terms always are). If the list can't be fetched the step is skipped with
+one log line; the old `fetch_ingredient_list` still works.
 
-**Why this runs weekly, not daily.** Recipe ingredient prices don't need
-same-day freshness the way a daily category scrape does, and searching by
-name is one extra page load per ingredient rather than a handful of fixed
-category pages - so this runs weekly instead of being folded into the
-daily job. On top of that, `data/search_cache.json` tracks the date each
-ingredient was last successfully found and skips re-searching anything
-found within the last 7 days (`--stale-days` to change this), so even a
-weekly run only actually searches what's actually gone stale.
+**Pak'nSave and New World never use their site search.** Their robots.txt
+disallows `/shop/search`, so terms are matched locally against the products the
+category scrape just collected (`scraper/search_step.py`, `scraper/matching.py`:
+a shared word after simple plural stemming). A term is reported **not found**
+only if a category that should hold it was scraped this run and nothing matched;
+otherwise it is left unreported. Terms that matched are reported **found**.
+Add `covers=word,word` to a category line to say which words it holds.
 
-**What `--save` does**, in addition to everything the dry run prints:
-- writes a dated snapshot to `data/search_snapshots/`, separate from the
-  daily scrape's `data/snapshots/`,
-- adds new entries to the same `data/price_history.json` the daily scrape
-  updates (a search-found product is still the same product),
-- updates `data/search_cache.json` with today's date for every ingredient
-  matched this run, and
-- best-effort publishes matched products to the recipe app's mailbox, via
-  the same `MAILBOX_URL`/`MAILBOX_TOKEN` publishing step described above.
+**Woolworths** uses its public JSON API: the browse API for the watch categories
+in `woolworths_categories.txt`, and the product-search API for each term (with a
+short delay between requests). robots.txt disallows only `/shop/search` (the HTML
+page), not `/api/v1/products`. A term is not found when the search ran and nothing
+sensible came back.
 
-A dry run never touches `search_cache.json` - only a `--save` run advances
-which ingredients count as "recently found".
+**robots.txt.** Every scraper fetches robots.txt once per run per site
+(`scraper/robots.py`) and skips, with a log line, any disallowed path. If
+robots.txt itself can't be fetched, the run carries on. Foodstuffs page loads
+are spaced a few seconds apart; Woolworths requests too.
 
-**Running it on a schedule.** `run_weekly.sh` wraps `python -m
-scraper.search_run --save` the same way `run_daily.sh` wraps the category
-scrape - logging to a dated file under `logs/` and ending it with a
-`RESULT: ...` line. It's driven by its own cron entry, separate from and
-slower than the daily job:
+**Logs.** Each log ends with a `SUMMARY:` line (products published, terms
+searched, found, not found, skipped, categories scraped, run time) and then the
+`RESULT:` line.
 
-```
-0 7 * * *   /path/to/run_daily.sh    # every day, 7:00am
-0 8 * * 0   /path/to/run_weekly.sh   # Sundays only, 8:00am
-```
+**Secrets.** `MAILBOX_URL` and `MAILBOX_TOKEN` live in
+`~/.config/paknsave-scraper/env` (outside the repo, chmod 600). The run scripts
+source it and stop with a clear message if it is missing. See `env.example`.
+
+`run_daily.sh` (category scrape only, `scraper.run`) and `run_weekly.sh` (which
+now runs the same weekly job as above) still work by hand but are not in cron.
 
 ## Adding a new category to scrape
 
@@ -192,6 +182,8 @@ Optional extras you can add after the URL:
   paginates long category listings).
 - `category=name` — label these products with a specific category name
   instead of the one automatically taken from the URL.
+- `covers=word,word` — words this category holds, so a search term that
+  matches nothing can fairly be reported "not found" (see above).
 
 Lines starting with `#` are comments and are ignored.
 
