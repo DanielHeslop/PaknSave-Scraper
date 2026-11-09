@@ -11,7 +11,10 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 DEFAULT_INGREDIENT_LIST_URL = "https://my-recipe-manager.netlify.app/api/ingredient-list"
 TIMEOUT_SECONDS = 15
@@ -74,3 +77,162 @@ def fetch_ingredient_list(url: str = DEFAULT_INGREDIENT_LIST_URL) -> list[str]:
         raise IngredientListError(f"{url} did not return a JSON array of strings")
 
     return data
+
+
+STORES = ("paknsave", "newworld", "woolworths")
+
+
+def _log(message: str) -> None:
+    print(message, flush=True)
+
+
+def _normalise_term(term: str) -> str:
+    return " ".join(term.lower().split())
+
+
+@dataclass(frozen=True)
+class StoreLists:
+    """One store's lists from the app's ingredient-list endpoint (?store=<store>).
+
+    search_terms keeps the app's order (most useful first). skip holds
+    normalised (lower-case, single-spaced) terms the app doesn't want
+    searched at this store right now - use is_skipped() rather than testing
+    membership by hand.
+    """
+
+    store: str
+    search_terms: list[str] = field(default_factory=list)
+    watch_terms: list[str] = field(default_factory=list)
+    watch_categories: list[str] = field(default_factory=list)
+    skip: frozenset[str] = frozenset()
+
+    def is_skipped(self, term: str) -> bool:
+        return _normalise_term(term) in self.skip
+
+
+def _store_url(url: str, store: str, action: str | None = None) -> str:
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    query = [(k, v) for k, v in query if k not in ("store", "action")]
+    query.append(("store", store))
+    if action:
+        query.append(("action", action))
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
+
+
+def _auth_headers(extra: dict | None = None) -> dict:
+    headers = {"Accept": "application/json"}
+    if extra:
+        headers.update(extra)
+    token = os.environ.get(MAILBOX_TOKEN_ENV)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _string_list(value, what: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ValueError(f"{what} is not a list")
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        term = item.get("term") if isinstance(item, dict) else item
+        if not isinstance(term, str):
+            raise ValueError(f"{what} has an entry that is not a term")
+        term = term.strip()
+        key = _normalise_term(term)
+        if term and key not in seen:
+            seen.add(key)
+            out.append(term)
+    return out
+
+
+def fetch_store_lists(
+    store: str, url: str = DEFAULT_INGREDIENT_LIST_URL, timeout: int = TIMEOUT_SECONDS
+) -> StoreLists | None:
+    """GET <url>?store=<store> and return that store's lists, or None on any failure.
+
+    FAILS OPEN: a network error, non-2xx status, or unexpected response shape
+    logs one short line (never the token) and returns None, so the caller can
+    carry on without the search step. Never raises.
+    """
+    full_url = _store_url(url, store)
+    request = urllib.request.Request(full_url, headers=_auth_headers())
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = response.status
+            body = response.read()
+        if not (200 <= status < 300):
+            raise ValueError(f"status {status}")
+        data = json.loads(body)
+        if not isinstance(data, dict):
+            raise ValueError("response is not a JSON object")
+        watch = data.get("watch")
+        if watch is None:
+            watch = {}
+        if not isinstance(watch, dict):
+            raise ValueError("watch is not an object")
+        return StoreLists(
+            store=store,
+            search_terms=_string_list(data.get("search") or [], "search"),
+            watch_terms=_string_list(watch.get("terms") or [], "watch.terms"),
+            watch_categories=_string_list(watch.get("categories") or [], "watch.categories"),
+            skip=frozenset(_normalise_term(t) for t in _string_list(data.get("skip") or [], "skip")),
+        )
+    except urllib.error.HTTPError as e:
+        reason = f"status {e.code} ({e.reason})"
+    except urllib.error.URLError as e:
+        reason = f"could not connect ({e.reason})"
+    except TimeoutError:
+        reason = f"timed out after {timeout}s"
+    except (ValueError, UnicodeDecodeError) as e:
+        reason = f"unexpected response ({e})"
+    except Exception as e:
+        reason = f"unexpected error ({type(e).__name__})"
+    _log(f"Could not fetch the {store} search list: {reason} - continuing without the search step.")
+    return None
+
+
+def _post_terms(store: str, action: str, payload: dict, url: str, timeout: int = TIMEOUT_SECONDS) -> bool:
+    request = urllib.request.Request(
+        _store_url(url, store, action),
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers=_auth_headers({"Content-Type": "application/json"}),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = response.status
+        if 200 <= status < 300:
+            return True
+        reason = f"status {status}"
+    except urllib.error.HTTPError as e:
+        reason = f"status {e.code} ({e.reason})"
+    except urllib.error.URLError as e:
+        reason = f"could not connect ({e.reason})"
+    except TimeoutError:
+        reason = f"timed out after {timeout}s"
+    except Exception as e:
+        reason = f"unexpected error ({type(e).__name__})"
+    _log(f"Reporting {action} terms for {store} failed: {reason} - ignoring.")
+    return False
+
+
+def report_not_found(
+    store: str,
+    terms: list[str],
+    url: str = DEFAULT_INGREDIENT_LIST_URL,
+    searched_at: str | None = None,
+) -> bool:
+    """Tell the app these terms had no results at this store. Never raises."""
+    if not terms:
+        return True
+    searched_at = searched_at or datetime.now(timezone.utc).isoformat()
+    return _post_terms(store, "not-found", {"terms": list(terms), "searchedAt": searched_at}, url)
+
+
+def report_found(store: str, terms: list[str], url: str = DEFAULT_INGREDIENT_LIST_URL) -> bool:
+    """Tell the app these terms found something at this store (resets not-found). Never raises."""
+    if not terms:
+        return True
+    return _post_terms(store, "found", {"terms": list(terms)}, url)
