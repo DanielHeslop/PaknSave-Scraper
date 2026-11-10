@@ -73,7 +73,7 @@ def test_summary_line_fields():
     line = summary_line(12, outcome, 5, 125)
     assert line == (
         "SUMMARY: products published 12, terms searched 3, found 1, not found 1, skipped 1, "
-        "categories scraped 5, run time 2m05s"
+        "categories scraped 5, matcher none, found via fallback key 0, run time 2m05s"
     )
 
 

@@ -139,8 +139,25 @@ watch terms, watch categories and a skip list. Skipped terms are not searched
 (watch terms always are). If the list can't be fetched the step is skipped with
 one log line; the old `fetch_ingredient_list` still works.
 
+**Which matcher decides found / not found.** After scraping, every store sends its
+terms (search terms not in skip, plus watch terms) and every product scraped this
+run to the app's own matcher (`POST <site>/api/match-terms`, `scraper/app_matcher.py`;
+`<site>` is the origin of `MAILBOX_URL`, Bearer `MAILBOX_TOKEN`; split into calls of
+at most 300 terms and 6,000 products). So the app and the Pi agree. A term the app
+found only through a fallback key is logged ("tamari: found via soy sauce"). If the
+call fails for any reason (network, 30s timeout, any non-200) the run logs one line
+and uses the local matcher below for the rest of the run; the run never fails
+because of the endpoint. Not-found is still reported only when the term's category
+was scraped (Woolworths: when its search ran). The `SUMMARY:` line says which
+matcher was used (`app <version>` or `local fallback`) and how many terms were
+found via a fallback key.
+
+`python -m scraper.compare_matchers --site newworld --snapshot data/newworld_snapshots/<date>.json`
+(env file sourced) compares the app's matcher with the local one on a saved
+snapshot using the store's current terms. It publishes and reports nothing.
+
 **Pak'nSave and New World never use their site search.** Their robots.txt
-disallows `/shop/search`, so terms are matched locally against the products the
+disallows `/shop/search`, so the local backup matcher works on the products the
 category scrape just collected (`scraper/search_step.py`, `scraper/matching.py`:
 every main word of the term must be in the product name, with plurals and
 spellings like yoghurt/yogurt folded; other forms such as powder, mix, sauce or
@@ -180,8 +197,8 @@ robots.txt itself can't be fetched, the run carries on. Foodstuffs page loads
 are spaced a few seconds apart; Woolworths requests too.
 
 **Logs.** Each log ends with a `SUMMARY:` line (products published, terms
-searched, found, not found, skipped, categories scraped, run time) and then the
-`RESULT:` line.
+searched, found, not found, skipped, categories scraped, matcher used, terms found
+via a fallback key, run time) and then the `RESULT:` line.
 
 **Secrets.** `MAILBOX_URL` and `MAILBOX_TOKEN` live in
 `~/.config/paknsave-scraper/env` (outside the repo, chmod 600). The run scripts

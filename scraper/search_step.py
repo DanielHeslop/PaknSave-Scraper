@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from scraper.app_matcher import AppMatchError, AppMatches, match_terms
 from scraper.ingredients import StoreLists, report_found, report_not_found
 from scraper.matching import _stem, match_products
 
@@ -54,6 +56,8 @@ class SearchOutcome:
     unreported: list[str] = field(default_factory=list)  # searched, nothing matched, but no category to blame
     skipped: list[str] = field(default_factory=list)  # app says skip
     unsearched: list[str] = field(default_factory=list)  # ran out of time
+    matcher: str = "none"  # "app <version>", "local fallback", or "none" if nothing was searched
+    via: dict[str, str] = field(default_factory=dict)  # term -> fallback key that found it (app matcher only)
 
     @property
     def matched_products(self) -> list[dict]:
@@ -128,6 +132,64 @@ def local_search(
     return outcome
 
 
+def local_fallback(reason: str) -> None:
+    log(f"App matcher unavailable ({reason}) - using the local matcher for this run.")
+
+
+def try_app_match(store: str, terms: list[str], products: list[dict]) -> AppMatches | None:
+    """The app's verdict on every term, or None (after one log line) if it can't be had."""
+    if not terms:
+        return None
+    try:
+        return match_terms(store, terms, products)
+    except AppMatchError as e:
+        local_fallback(str(e))
+    except Exception as e:
+        local_fallback(f"unexpected error, {type(e).__name__}")
+    return None
+
+
+def outcome_from_app(
+    matches: AppMatches, terms: list[str], products: list[dict], reportable: Callable[[str], bool]
+) -> SearchOutcome:
+    """Turn the app's answers into a SearchOutcome.
+
+    reportable(term) says whether a term nothing matched may be reported "not
+    found" (otherwise it goes to `unreported`).
+    """
+    by_id = {str(p["product_id"]): p for p in products}
+    outcome = SearchOutcome(searched=list(terms), matcher=f"app {matches.version}")
+    for term in terms:
+        result = matches.results[term]
+        if result.found:
+            outcome.found[term] = [by_id[i] for i in result.product_ids if i in by_id]
+            if result.via:
+                outcome.via[term] = result.via
+        elif reportable(term):
+            outcome.not_found.append(term)
+        else:
+            outcome.unreported.append(term)
+    return outcome
+
+
+def search_products_for_terms(
+    store: str,
+    terms: list[str],
+    products: list[dict],
+    scraped_words: set[str],
+    deadline: float | None = None,
+) -> SearchOutcome:
+    """Foodstuffs search step: the app's matcher, or the local one if the app can't be used."""
+    products = dedupe_products(products)
+    matches = try_app_match(store, terms, products)
+    if matches is not None:
+        return outcome_from_app(matches, terms, products, lambda t: term_has_scraped_home(t, scraped_words))
+    outcome = local_search(terms, products, scraped_words, deadline)
+    if terms:
+        outcome.matcher = "local fallback"
+    return outcome
+
+
 def report_outcome(store: str, outcome: SearchOutcome) -> None:
     """Send found / not-found to the app. Never raises (the report_* calls swallow failures)."""
     report_found(store, list(outcome.found))
@@ -143,6 +205,8 @@ def log_outcome(outcome: SearchOutcome) -> None:
     )
     for term, matches in outcome.found.items():
         log(f"  FOUND     {term!r}: {len(matches)} product(s)")
+    for term, key in outcome.via.items():
+        log(f"  {term}: found via {key}")
     for term in outcome.not_found:
         log(f"  NOT FOUND {term!r}")
     for term in outcome.unreported:
@@ -156,5 +220,6 @@ def summary_line(
     return (
         f"SUMMARY: products published {products_published}, terms searched {len(outcome.searched)}, "
         f"found {len(outcome.found)}, not found {len(outcome.not_found)}, skipped {len(outcome.skipped)}, "
-        f"categories scraped {categories_scraped}, run time {minutes}m{secs:02d}s"
+        f"categories scraped {categories_scraped}, matcher {outcome.matcher}, "
+        f"found via fallback key {len(outcome.via)}, run time {minutes}m{secs:02d}s"
     )

@@ -5,10 +5,12 @@ search step, then publish - in that order.
      watch categories), with robots.txt honoured and a polite pause between
      page loads. Snapshot and price history are written straight away.
   2. Search step: the app's per-store list (GET ?store=<store>) gives the
-     terms to look for. They are matched LOCALLY against the products just
-     scraped - the sites' own search pages are disallowed by robots.txt, so
-     nothing is requested from them. Found / not-found is reported back to
-     the app. Time-boxed; a failure here is logged and never stops step 3.
+     terms to look for. They are matched against the products just scraped
+     by the app's own matcher (POST /api/match-terms), with the local matcher
+     as the backup if that call fails - the sites' own search pages are
+     disallowed by robots.txt, so nothing is requested from them. Found /
+     not-found is reported back to the app. Time-boxed; a failure here is
+     logged and never stops step 3.
   3. Publish: the de-duplicated products go to the mailbox. Runs even if
      step 2 failed.
 
@@ -39,10 +41,10 @@ from scraper.search_step import (
     SearchOutcome,
     category_words,
     dedupe_products,
-    local_search,
     log_outcome,
     plan_terms,
     report_outcome,
+    search_products_for_terms,
     summary_line,
 )
 from scraper.storage import update_price_history, write_snapshot
@@ -158,7 +160,7 @@ async def main_async(args: argparse.Namespace) -> int:
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
 
     log("\n" + "=" * 60)
-    log("STEP 2: SEARCH (local - matched against the products just scraped)")
+    log("STEP 2: SEARCH (app matcher, local backup - matched against the products just scraped)")
     log("=" * 60)
     outcome = SearchOutcome()
     try:
@@ -186,7 +188,7 @@ async def main_async(args: argparse.Namespace) -> int:
 
 
 def run_search_step(args, store: str, products: list[dict], scraped_categories: dict) -> SearchOutcome:
-    """Fetch the app's list for this store, search it locally, report the result."""
+    """Fetch the app's list for this store, match it (app matcher, local backup), report the result."""
     deadline = time.monotonic() + SEARCH_TIME_BUDGET_SECONDS
     lists = fetch_store_lists(store, args.ingredient_list_url)
     if lists is None:
@@ -202,7 +204,7 @@ def run_search_step(args, store: str, products: list[dict], scraped_categories: 
     for label, covers in scraped_categories.items():
         scraped_words |= category_words(label, covers)
 
-    outcome = local_search(terms, products, scraped_words, deadline)
+    outcome = search_products_for_terms(store, terms, products, scraped_words, deadline)
     outcome.skipped = skipped
     log_outcome(outcome)
 

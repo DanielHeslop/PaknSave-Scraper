@@ -4,8 +4,10 @@
      read through the public browse API.
   2. Search: the app's list for this store (GET ?store=woolworths) gives the terms;
      each is looked up through the public product-search API with a short delay
-     between terms, time-boxed to about 20 minutes. Found / not-found is reported
-     back to the app. A failure here never stops step 3.
+     between terms, time-boxed to about 20 minutes. The app's matcher
+     (POST /api/match-terms; the local matcher is the backup) then decides found /
+     not-found over everything browsed and searched, and that is reported back
+     to the app. A failure here never stops step 3.
   3. Publish: browse + matched search results, de-duplicated by product id, go to
      the mailbox. Runs even if step 2 failed.
 
@@ -37,9 +39,11 @@ from scraper.search_step import (
     SearchOutcome,
     dedupe_products,
     log_outcome,
+    outcome_from_app,
     plan_terms,
     report_outcome,
     summary_line,
+    try_app_match,
 )
 from scraper.storage import update_price_history, write_snapshot
 from scraper.woolworths_transport import BotDetected, browse_products, search_products
@@ -188,7 +192,7 @@ def browse_all(pages: list[BrowsePage]) -> dict:
 
 
 def search_all(
-    terms: list[str], size: int, deadline: float | None = None
+    terms: list[str], size: int, deadline: float | None = None, collected: list[dict] | None = None
 ) -> tuple[SearchOutcome, list[str]]:
     """Step 2: look each term up through the product-search API.
 
@@ -196,6 +200,9 @@ def search_all(
     fuzzy and returns loose matches). It is not-found only when the search ran
     and nothing sensible came back. A robots refusal or a failed request leaves
     the term unreported; a 403/429 stops the whole step.
+
+    Matching here is the local matcher, per term. `collected`, if given, gets every
+    valid product any search returned, so the app's matcher can be run over them all.
     """
     outcome = SearchOutcome()
     blocked: list[str] = []
@@ -222,7 +229,10 @@ def search_all(
             outcome.unreported.append(term)
             continue
         outcome.searched.append(term)
-        matches = match_products(term, [p for p in results if is_valid_product(p)[0]])
+        valid = [p for p in results if is_valid_product(p)[0]]
+        if collected is not None:
+            collected.extend(valid)
+        matches = match_products(term, valid)
         if matches:
             outcome.found[term] = matches
         else:
@@ -230,7 +240,25 @@ def search_all(
     return outcome, blocked
 
 
-def run_search_step(args) -> tuple[SearchOutcome, list[str]]:
+def apply_app_matcher(outcome: SearchOutcome, products: list[dict]) -> SearchOutcome:
+    """Re-decide found / not-found for the searched terms with the app's matcher.
+
+    products are the browse products plus everything the searches returned. A term
+    is "not found" only if its own search ran (it is not in outcome.unreported);
+    if the app can't be used the local per-term outcome is kept unchanged.
+    """
+    products = dedupe_products(products)
+    matches = try_app_match(STORE, outcome.searched, products)
+    if matches is None:
+        outcome.matcher = "local fallback" if outcome.searched else outcome.matcher
+        return outcome
+    search_failed = set(outcome.unreported)
+    rebuilt = outcome_from_app(matches, outcome.searched, products, lambda t: t not in search_failed)
+    rebuilt.skipped, rebuilt.unsearched = outcome.skipped, outcome.unsearched
+    return rebuilt
+
+
+def run_search_step(args, browse_products_list: list[dict] | None = None) -> tuple[SearchOutcome, list[str]]:
     deadline = time.monotonic() + SEARCH_TIME_BUDGET_SECONDS
     lists = fetch_store_lists(STORE, args.ingredient_list_url)
     reportable = lists is not None
@@ -245,8 +273,10 @@ def run_search_step(args) -> tuple[SearchOutcome, list[str]]:
             f"term(s), {len(skipped)} skipped."
         )
     log(f"{len(terms)} term(s) to search.")
-    outcome, blocked = search_all(terms, args.size, deadline)
+    collected: list[dict] = []
+    outcome, blocked = search_all(terms, args.size, deadline, collected)
     outcome.skipped = skipped
+    outcome = apply_app_matcher(outcome, list(browse_products_list or []) + collected)
     log_outcome(outcome)
     if not reportable:
         pass
@@ -319,7 +349,7 @@ def main() -> int:
     log("\nSTEP 2: SEARCH (product-search API)")
     outcome = SearchOutcome()
     try:
-        outcome, blocked = run_search_step(args)
+        outcome, blocked = run_search_step(args, browse_products_list)
         stats["terms_blocked"] = stats["terms_blocked"] + blocked
     except Exception as e:
         log(f"Search step failed ({type(e).__name__}: {e}) - carrying on to publish.")
