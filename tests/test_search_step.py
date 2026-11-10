@@ -21,7 +21,7 @@ def test_plurals_match_locally_but_not_in_the_strict_matcher():
     assert not is_confident_match("courgette", "Green Courgettes")
     assert is_local_match("courgette", "Green Courgettes")
     assert is_local_match("leeks", "Leek")
-    assert is_local_match("tomatoes", "Tomato Truss")
+    assert is_local_match("tomatoes", "Truss Tomatoes")
     assert not is_local_match("saffron", "Green Courgettes")
 
 

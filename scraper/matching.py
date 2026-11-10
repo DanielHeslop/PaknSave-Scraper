@@ -97,6 +97,20 @@ _GENERIC = {
 _JOINERS = {"&", "and"}
 _TOKEN_PATTERN = re.compile(r"[a-z]+|&")
 
+# The main item of a product is its last noun phrase before one of these.
+_CONNECTORS = {"with", "in", "infused", "&", "and"}
+_MAIN_ITEM_TOKEN = re.compile(r"[a-z0-9]+|&")
+
+# Packaging / pack-shape words (canonical forms) that trail the real item:
+# "Garlic Bulb", "Manuka Honey Jar", "Garlic Butter Block".
+_PACK_WORDS = {
+    "bulb", "jar", "bottle", "tub", "block", "bag", "pack", "tin", "can",
+    "punnet", "bunch", "pouch", "sachet", "carton", "tray", "squeeze",
+}
+
+# A main noun that is also a kind of another item: tamari is a soy sauce.
+_IS_A = {"tamari": {"sauce"}}
+
 
 def _canon(word: str) -> str:
     stem = _stem(word)
@@ -118,8 +132,9 @@ def _significant_words_ordered(text: str) -> list[str]:
 
 class _Term:
     def __init__(self, term: str):
+        self.text = term
         self.words = _term_words(term)
-        self.forms = {w for w in self.words if w in _FORMS}
+        self.forms = {w for w in self.words if w in _FORMS} | {k for w in self.words for k in _IS_A.get(w, ())}
         self.has_joiner = bool(re.search(r"&|\band\b", term.lower()))
         self.has_descriptors = any(w in _DESCRIPTORS for w in self.words)
 
@@ -157,6 +172,42 @@ def _product_words(name: str) -> tuple[set[str], set[str]]:
     return everything, plain
 
 
+def _main_item(text: str, cut_at_joiners: bool) -> list[str]:
+    """Words of the main item: the last noun phrase before with / & / and / in / infused.
+
+    Brand and size come off naturally: sizes ("250g", "3pk", "(5pk)") are
+    dropped, text after a comma or in brackets is a qualifier, and the head
+    noun is the last word, so a leading brand never reaches it. Trailing
+    descriptors and pack words are trimmed so "Garlic Bulb 3pk" is "garlic".
+    "&" / "and" only cut when cut_at_joiners (a term that itself says
+    "garlic and herb butter" needs them kept).
+    """
+    text = re.sub(r"\([^)]*\)", " ", text.lower()).split(",")[0]
+    words: list[str] = []
+    for token in _MAIN_ITEM_TOKEN.findall(text):
+        if token in _CONNECTORS and (cut_at_joiners or token not in _JOINERS):
+            if words:
+                break
+            continue
+        if token in _JOINERS or token[0].isdigit() or len(token) < 3 or token in _STOPWORDS:
+            continue
+        words.append(_canon(token))
+    trailing_noise = _DESCRIPTORS | _GENERIC | _PACK_WORDS
+    while len(words) > 1 and words[-1] in trailing_noise:
+        words.pop()
+    return words
+
+
+def _main_item_matches(term: _Term, name: str) -> bool:
+    """The term's main noun must be the product's main item ("honey" is not "honey yoghurt")."""
+    cut = not term.has_joiner
+    wanted, found = _main_item(term.text, cut), _main_item(name, cut)
+    if not wanted or not found:
+        return True
+    noun = wanted[-1]
+    return found[-1] == noun or (noun in found and found[-1] in _IS_A.get(noun, ()))
+
+
 def _matches(term: _Term, name: str, drop_descriptors: bool) -> bool:
     required = term.required(drop_descriptors)
     if not required or all(w in _GENERIC for w in required):
@@ -165,7 +216,9 @@ def _matches(term: _Term, name: str, drop_descriptors: bool) -> bool:
     available = everything if term.has_joiner else plain
     if not all(w in available for w in required):
         return False
-    return not ((everything & _FORMS) - term.forms)
+    if (everything & _FORMS) - term.forms:
+        return False
+    return _main_item_matches(term, name)
 
 
 def is_local_match(term: str, product_name: str, *, drop_descriptors: bool = False) -> bool:
@@ -174,7 +227,9 @@ def is_local_match(term: str, product_name: str, *, drop_descriptors: bool = Fal
     Plurals and the synonyms above are folded. Products of a different form
     (powder, mix, sauce, ...) and products where the term only appears as a
     flavour ("garlic & herb chicken") are rejected, and a term made only of
-    generic words ("dry", "white") never matches. Use match_products() to get
+    generic words ("dry", "white") never matches. The term's main noun must
+    also be the product's main item, so "honey" is not "honey yoghurt" and
+    "butter" is not "Butter Chicken". Use match_products() to get
     the descriptor-dropping fallback applied across a whole product list.
     """
     return _matches(_Term(term), product_name, drop_descriptors)

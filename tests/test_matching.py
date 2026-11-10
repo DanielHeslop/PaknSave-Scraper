@@ -105,17 +105,17 @@ def test_form_word_in_the_term_allows_that_form():
 def test_synonyms_and_plurals():
     assert _found("yoghurt", "Greek Yogurt Natural") == ["Greek Yogurt Natural"]
     assert _found("yogurt", "Fresh'n Fruity Yoghurt") == ["Fresh'n Fruity Yoghurt"]
-    assert _found("chilli", "Red Chili Pepper") == ["Red Chili Pepper"]
-    assert _found("chili", "Chilli Flakes") == ["Chilli Flakes"]
+    assert _found("chilli", "Red Chili 100g") == ["Red Chili 100g"]
+    assert _found("chili", "Green Chilli") == ["Green Chilli"]
     assert _found("courgette", "Green Courgettes", "Zucchini 1kg") == ["Green Courgettes", "Zucchini 1kg"]
-    assert _found("tomatoes", "Tomato Truss") == ["Tomato Truss"]
+    assert _found("tomatoes", "Truss Tomato") == ["Truss Tomato"]
     assert _found("molasse", "Molasses 500g") == ["Molasses 500g"]
 
 
 def test_descriptors_dropped_only_once_and_only_if_nothing_matches():
     assert _found("fresh frozen organic peas", "Frozen Peas", "Organic Peas", "Green Beans") == ["Frozen Peas", "Organic Peas"]
-    assert _found("frozen peas", "Peas Garden") == ["Peas Garden"]
-    assert _found("frozen peas", "Frozen Peas", "Peas Garden") == ["Frozen Peas"]
+    assert _found("frozen peas", "Garden Peas") == ["Garden Peas"]
+    assert _found("frozen peas", "Frozen Peas", "Garden Peas") == ["Frozen Peas"]
 
 
 def test_term_of_only_descriptors_never_matches_even_after_dropping():
@@ -134,3 +134,53 @@ def test_local_search_uses_the_strict_rules():
     assert [p["name"] for p in outcome.found["garlic"]] == ["Garlic"]
     assert [p["name"] for p in outcome.found["milk"]] == ["Blue Top Milk"]
     assert outcome.not_found == ["dry white wine"]
+
+
+def test_honey_and_lemon_do_not_match_yoghurts():
+    assert _found("honey", "Honey Yoghurt", "Greek Honey Yoghurt 1kg", "Manuka Honey 500g") == ["Manuka Honey 500g"]
+    assert _found("lemon", "Lemon Yoghurt", "Fresh 'n Fruity Zesty Lemon Yoghurt", "Lemons") == ["Lemons"]
+
+
+def test_butter_does_not_match_butter_chicken():
+    assert _found("butter", "Butter Chicken", "Wattie's Butter Chicken 350g", "Garlic Butter Chicken Kievs") == []
+
+
+def test_garlic_does_not_match_beef_and_black_garlic_sausages():
+    assert _found("garlic", "Beef & Black Garlic Sausages", "Harmony Beef & Black Garlic Sausages 400g") == []
+
+
+def test_tamari_matches_tamari_soy_sauce_as_a_kind_of_soy_sauce():
+    assert _found("tamari", "Organic Tamari Soy Sauce", "Kikkoman Soy Sauce") == ["Organic Tamari Soy Sauce"]
+
+
+def test_tamari_exception_does_not_let_other_nouns_through():
+    assert _found("tamari", "Tamari Almonds", "Soy Tamari Rice Crackers") == []
+
+
+def test_garlic_still_matches_bulbs_and_pack_sizes():
+    names = ["Garlic Bulb 3pk", "Garlic (5pk)", "Garlic", "Pams Crushed Garlic", "Masterfoods Finely Crushed Garlic Jar"]
+    assert _found("garlic", *names) == names
+
+
+def test_butter_still_matches_salted_and_unsalted_butter():
+    names = ["Anchor Salted Butter 500g", "Mainland Unsalted Butter 250g", "Pams Butter Block 500g"]
+    assert _found("butter", *names) == names
+
+
+def test_honey_still_matches_honey_jars():
+    names = ["Manuka Honey Jar 500g", "Airborne Honey 500g", "Pams Squeeze Honey Bottle", "Clover Honey (1kg)"]
+    assert _found("honey", *names) == names
+
+
+def test_text_after_with_in_and_infused_is_not_the_main_item():
+    assert _found("sardines", "Pams Sardines In Olive Oil") == ["Pams Sardines In Olive Oil"]
+    assert _found("olive oil", "Pams Sardines In Olive Oil") == []
+    assert _found("tomato", "Diced Tomatoes With Garlic And Oregano") == ["Diced Tomatoes With Garlic And Oregano"]
+    assert _found("garlic", "Diced Tomatoes With Garlic And Oregano") == []
+    assert _found("olive oil", "Olive Oil Infused With Chilli") == ["Olive Oil Infused With Chilli"]
+    assert _found("chilli", "Olive Oil Infused With Chilli") == []
+
+
+def test_term_with_and_keeps_its_own_pair():
+    assert _found("salt and pepper", "Salt & Pepper Grinder Set") == []
+    assert _found("garlic and herb butter", "Garlic & Herb Butter Block", "Garlic Butter Chicken") == ["Garlic & Herb Butter Block"]
