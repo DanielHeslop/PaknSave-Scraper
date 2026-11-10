@@ -184,3 +184,72 @@ def test_text_after_with_in_and_infused_is_not_the_main_item():
 def test_term_with_and_keeps_its_own_pair():
     assert _found("salt and pepper", "Salt & Pepper Grinder Set") == []
     assert _found("garlic and herb butter", "Garlic & Herb Butter Block", "Garlic Butter Chicken") == ["Garlic & Herb Butter Block"]
+
+
+@pytest.mark.parametrize(
+    "term, product, expected",
+    [
+        ("honey", "Honey Yoghurt", False),
+        ("lemon", "Lemon Yoghurt", False),
+        ("butter", "Butter Chicken", False),
+        ("garlic", "Beef & Black Garlic Sausages", False),
+        ("tamari", "Organic Tamari Soy Sauce", True),
+        ("yoghurt", "Cyclops Thick & Creamy Natural Yoghurt", True),
+        ("yoghurt", "Yoplait With Real Blueberry Yoghurt", True),
+        ("weet-bix", "Sanitarium Weet-Bix Breakfast Cereal", True),
+        ("focaccia", "Kapiti Focaccia Bread", True),
+        ("butter", "Butter Chicken", False),
+        ("garlic", "Garlic & Herb Butterfly Chicken", False),
+    ],
+)
+def test_main_item_table(term, product, expected):
+    assert bool(_found(term, product)) is expected
+
+
+def test_with_and_in_cut_only_after_a_food_noun():
+    breast = "Chicken Breast with Garlic Butter"
+    assert _found("chicken breast", breast) == [breast]
+    assert _found("garlic", breast) == []
+    assert _found("butter", breast) == []
+    assert _found("sardines", "Sardines in Olive Oil") == ["Sardines in Olive Oil"]
+    assert _found("tomatoes", "Wattie's Tomatoes Chopped In Puree") == ["Wattie's Tomatoes Chopped In Puree"]
+
+
+def test_with_after_a_lone_brand_is_not_a_cut():
+    assert _found("strawberry", "Yoplait With Real Strawberry Yoghurt") == []
+    assert _found("yoghurt", "Yoplait Greek Style With Honey Yoghurt") == ["Yoplait Greek Style With Honey Yoghurt"]
+    assert _found("honey", "Yoplait Greek Style With Honey Yoghurt") == []
+
+
+def test_and_and_ampersand_never_cut_the_name():
+    assert _found("yoghurt", "Thick and Creamy Yoghurt", "Thick & Creamy Yoghurt") == ["Thick and Creamy Yoghurt", "Thick & Creamy Yoghurt"]
+    assert _found("thick", "Thick & Creamy Yoghurt") == []
+    assert _found("cheese", "Cream Cheese & Chives") == ["Cream Cheese & Chives"]
+    assert _found("chives", "Cream Cheese & Chives") == ["Cream Cheese & Chives"]
+
+
+@pytest.mark.parametrize(
+    "term, product",
+    [
+        ("tamari", "Organic Tamari Soy Sauce"),
+        ("weet-bix", "Sanitarium Weet-Bix Breakfast Cereal"),
+        ("focaccia", "Kapiti Focaccia Bread"),
+        ("pita", "Mission Pita Loaf"),
+        ("ciabatta", "Ciabatta Rolls"),
+        ("hummus", "Hummus Dip Spread"),
+    ],
+)
+def test_generic_main_item_matches_the_term_before_it(term, product):
+    assert _found(term, product) == [product]
+
+
+def test_generic_rule_still_respects_forms_and_other_words():
+    assert _found("tomato", "Pams Tomato Sauce") == []
+    assert _found("tamari", "Tamari Almonds", "Soy Tamari Rice Crackers") == []
+    assert _found("focaccia", "Focaccia Crisps") == []
+    assert _found("weet-bix", "Sanitarium Cereal Bars") == []
+
+
+def test_mix_is_generic_only_when_the_term_says_mix():
+    assert _found("pancake", "Edmonds Pancake Mix") == []
+    assert _found("pancake mix", "Edmonds Pancake Mix") == ["Edmonds Pancake Mix"]
