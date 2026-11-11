@@ -40,6 +40,7 @@ skipped with a logged reason rather than crashing the whole search.
 from __future__ import annotations
 
 import random
+import re
 import time
 from datetime import date
 
@@ -177,6 +178,49 @@ def _normalise_cup_measure(measure: str) -> str:
     return measure
 
 
+_PROMO_TAG_LABELS = {
+    "IsClubPrice": "Club price",
+    "IsSpecial": "Special",
+    "IsGreatPrice": "Great price",
+}
+
+
+def _read_promo(item: dict, price: float) -> dict:
+    """Promo fields from the public price block and product tag, or {}.
+
+    Sale: salePrice below originalPrice. Member: the same, with isClubPrice.
+    Multibuy: only if productTag.multiBuy is filled in (never seen in a live
+    sample, so this path is unverified).
+    """
+    price_block = item.get("price") or {}
+    tag = item.get("productTag") or {}
+    original = price_block.get("originalPrice")
+    ends = price_block.get("promotionEndDate")
+    ends = str(ends)[:10] if ends else None
+
+    multibuy = tag.get("multiBuy")
+    if multibuy:
+        text = multibuy if isinstance(multibuy, str) else (
+            multibuy.get("text") or multibuy.get("name") or multibuy.get("description") or ""
+        )
+        qty = re.match(r"\s*(\d+)\s*for\b", str(text), re.IGNORECASE)
+        promo = {"promo_type": "multibuy", "promo_label": str(text) or "Multibuy"}
+        if qty:
+            promo["promo_min_qty"] = int(qty.group(1))
+        if ends:
+            promo["promo_ends"] = ends
+        return promo
+
+    if original is None or not price < original:
+        return {}
+    promo_type = "member" if price_block.get("isClubPrice") else "sale"
+    label = _PROMO_TAG_LABELS.get(tag.get("tagType") or "", "Club price" if promo_type == "member" else "Special")
+    promo = {"promo_type": promo_type, "promo_label": label}
+    if ends:
+        promo["promo_ends"] = ends
+    return promo
+
+
 def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | None]:
     """Parse one raw search-result/product-lookup item into this repo's
     product dict shape, or return (None, reason) if it can't be read at all.
@@ -205,15 +249,30 @@ def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | 
     if not size and (item.get("unit") or "").lower() == "each":
         size = "ea"
 
-    unit_price: float | None = None
-    unit: str | None = None
     cup_price = size_block.get("cupPrice")
     cup_measure = size_block.get("cupMeasure")
+    cup_text = ""
+    unit_price: float | None = None
+    unit: str | None = None
     if cup_price is not None and cup_measure:
-        parsed = parse_raw_unit_price(f"${cup_price}/{_normalise_cup_measure(cup_measure)}")
+        cup_text = f"${cup_price}/{_normalise_cup_measure(cup_measure)}"
+        parsed = parse_raw_unit_price(cup_text, name)
         if parsed is not None:
             unit_price = parsed.amount
             unit = parsed.unit
+
+    promo = _read_promo(item, price)
+    on_promo = promo.get("promo_type") in ("sale", "member")
+    regular_pack_price = price_block.get("originalPrice") if on_promo else price
+    if regular_pack_price is None:
+        regular_pack_price = price
+    list_price = size_block.get("cupListPrice")
+    if on_promo:
+        # cupPrice is the promo unit price; cupListPrice the regular one (0.0 when absent).
+        promo["promo_unit_raw"] = cup_text
+        unit_raw = f"${list_price}/{_normalise_cup_measure(cup_measure)}" if list_price and cup_measure else ""
+    else:
+        unit_raw = cup_text
 
     departments = item.get("departments") or []
     category = departments[0].get("name") if departments and departments[0].get("name") else fallback_category
@@ -228,6 +287,13 @@ def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | 
         "unit": unit,
         "scraped_at": date.today().isoformat(),
         "supermarket": SUPERMARKET_LABEL,
+        # Raw inputs for scraper/item_fields.py. "price" above stays the price
+        # charged now (sale price when there is one).
+        "unit_raw": unit_raw,
+        "pack_price": price,
+        "regular_pack_price": regular_pack_price,
+        "package_type": size_block.get("packageType"),
+        **promo,
     }, None
 
 
@@ -326,3 +392,23 @@ def get_product_by_stock_code(stock_code: str) -> dict | None:
         _log(f"  {stock_code} - {reason}")
         return None
     return product
+
+
+def get_product_description_text(stock_code: str) -> str | None:
+    """Description plus claims text for one product, from the public product page API.
+
+    One throttled request through the same robots-checked, retrying path as
+    every other Woolworths call. Returns None when the product can't be read.
+    """
+    session = _new_session()
+    response = _get_with_retry(session, f"{BASE_URL}/{stock_code}")
+    if response.status_code == 404:
+        return None
+    data = response.json()
+    parts = [data.get("description") or ""]
+    claims = data.get("claims")
+    if isinstance(claims, list):
+        parts.extend(str(c) for c in claims)
+    elif claims:
+        parts.append(str(claims))
+    return "\n".join(parts)

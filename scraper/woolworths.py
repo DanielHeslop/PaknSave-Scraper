@@ -46,7 +46,13 @@ from scraper.search_step import (
     try_app_match,
 )
 from scraper.storage import update_price_history, write_snapshot
-from scraper.woolworths_transport import BotDetected, browse_products, search_products
+from scraper.woolworths_sheets import enrich_sheet_counts
+from scraper.woolworths_transport import (
+    BotDetected,
+    browse_products,
+    get_product_description_text,
+    search_products,
+)
 
 STORE = "woolworths"
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -324,6 +330,20 @@ def print_summary(stats: dict) -> None:
     print("=" * 60)
 
 
+def _enrich_sheets(products: list[dict], save: bool) -> None:
+    """Best-effort sheet counts from product descriptions; never stops the run."""
+    try:
+        lookups = enrich_sheet_counts(
+            products, get_product_description_text, save_cache=save, log=log
+        )
+        if lookups:
+            log(f"Sheet counts: looked up {lookups} product description(s).")
+    except BotDetected:
+        log("Sheet-count lookups stopped - the store pushed back.")
+    except Exception as e:
+        log(f"Sheet-count lookups skipped ({type(e).__name__}: {e}).")
+
+
 def main() -> int:
     started = time.monotonic()
     args = parse_args()
@@ -338,6 +358,8 @@ def main() -> int:
         return 1
     browse_products_list = browse["products"]
     stats = browse["stats"]
+
+    _enrich_sheets(browse_products_list, args.save)
 
     if args.save and browse_products_list:
         today = date.today().isoformat()
@@ -354,6 +376,7 @@ def main() -> int:
     except Exception as e:
         log(f"Search step failed ({type(e).__name__}: {e}) - carrying on to publish.")
 
+    _enrich_sheets([p for p in outcome.matched_products if p not in browse_products_list], args.save)
     to_publish = dedupe_products(browse_products_list + outcome.matched_products)
     stats["products_saved"] = len(to_publish)
     stats["products_with_unit_price"] = sum(1 for p in to_publish if p["unit_price"] is not None)

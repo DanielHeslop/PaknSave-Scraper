@@ -8,8 +8,8 @@ arithmetic behaves like money rather than plain floating point.
 
 "$X/each" (a product sold as a single item, with no weight or volume
 comparison) is a normal, valid outcome - not an error. Anything that
-doesn't match g/kg/ml/L/each is treated as unreadable (returns None) rather
-than guessed at, so a human can look at what shape of text it actually was.
+doesn't match g/kg/ml/L/each/sheets is treated as unreadable (returns None)
+rather than guessed at, so a human can look at what shape of text it actually was.
 """
 
 from __future__ import annotations
@@ -18,73 +18,100 @@ import re
 from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import dataclass
 
-# Matches PAK'nSAVE's own displayed unit price, e.g. "$0.49/100g", "$1.64/1L",
-# "$2.00/each". Captures the amount and the raw unit text after the slash.
-_UNIT_PRICE_PATTERN = re.compile(r"\$(\d+\.?\d*)\s*/\s*(\w+)")
+# Matches a store's displayed unit price, e.g. "$0.49/100g", "$1.64/1L",
+# "$2.00/each", "$0.26/100 sheets", "$0.39/100ss", "$1.05/100". Captures the
+# amount, the quantity after the slash (optional) and the unit word (optional).
+# A space between the quantity and the word is allowed.
+_UNIT_PRICE_PATTERN = re.compile(
+    r"\$(\d+\.?\d*)\s*(?:/|\bper\b)\s*(\d+\.?\d*)?\s*([A-Za-z]+)?",
+    re.IGNORECASE,
+)
 
-_GRAMS_PATTERN = re.compile(r"^(\d+)g$")
-_ML_PATTERN = re.compile(r"^(\d+)ml$", re.IGNORECASE)
+_KG_WORDS = {"kg", "kilo", "kilos", "kilogram", "kilograms"}
+_G_WORDS = {"g", "gm", "gram", "grams"}
+_L_WORDS = {"l", "litre", "litres", "liter", "liters"}
+_ML_WORDS = {"ml"}
+_EACH_WORDS = {"each", "ea", "item", "items"}
+_WIPE_NAME = re.compile(r"\bwipes?\b", re.IGNORECASE)
+_SHEET_WORDS = {"sheet", "sheets", "ss", "sht", "shts"}
+
+# Facial-tissue products: a bare "$1.05/100" there means per 100 sheets.
+# Toilet paper, paper towels and wipes are deliberately not matched.
+_TISSUE_PATTERN = re.compile(r"\b(tissues?|facials?)\b", re.IGNORECASE)
+_NOT_TISSUE_PATTERN = re.compile(r"\b(toilet|towels?|wipes?|bathroom)\b", re.IGNORECASE)
 
 
 @dataclass
 class StandardUnitPrice:
     amount: float
-    unit: str  # "kg", "L", or "each"
+    unit: str  # "kg", "L", "each" or "100sheets"
 
 
 def _round2(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
-def parse_raw_unit_price(raw_text: str) -> StandardUnitPrice | None:
+def _round4(value: Decimal) -> float:
+    return float(value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+
+
+def is_facial_tissue_name(name: str | None) -> bool:
+    if not name:
+        return False
+    return bool(_TISSUE_PATTERN.search(name)) and not _NOT_TISSUE_PATTERN.search(name)
+
+
+def parse_raw_unit_price(raw_text: str, name: str | None = None) -> StandardUnitPrice | None:
     """Find and standardise a "$X/Yunit" style string within raw_text.
 
-    Returns None if no such pattern is found, or if the unit found isn't
-    a recognised g/kg/ml/L/each shape.
+    Returns None if no such pattern is found, or if the unit isn't one of
+    kg, L, each or 100sheets after rescaling. `name` is only used for the
+    bare "$1.05/100" shape, which counts as per 100 sheets for facial
+    tissues and is left unparsed for everything else.
     """
+    if not raw_text:
+        return None
     match = _UNIT_PRICE_PATTERN.search(raw_text)
     if not match:
         return None
 
-    amount_str, raw_unit = match.group(1), match.group(2)
+    amount_str, qty_str, word = match.group(1), match.group(2), match.group(3)
     try:
         amount = Decimal(amount_str)
+        qty = Decimal(qty_str) if qty_str else None
     except Exception:
         return None
+    if qty is not None and qty <= 0:
+        return None
 
-    unit_lower = raw_unit.lower()
+    word_lower = word.lower() if word else None
+    per = qty if qty is not None else Decimal(1)
 
-    # "each" - no weight/volume unit at all. Pass the raw price through
-    # unchanged. This is the expected, correct outcome for items sold as
-    # single units (e.g. the "Belgium Slice - Each" case) - not a bug.
-    if unit_lower == "each" or unit_lower == "ea":
-        return StandardUnitPrice(amount=_round2(amount), unit="each")
+    if word_lower is None:
+        # "$1.05/100" - only facial tissues, and only with an explicit number.
+        if qty is not None and is_facial_tissue_name(name):
+            return StandardUnitPrice(amount=_round4(amount * Decimal(100) / qty), unit="100sheets")
+        return None
 
-    # Already a standard whole unit ("kg", "1kg", "L", "1l", ...)
-    if unit_lower in ("kg", "1kg"):
-        return StandardUnitPrice(amount=_round2(amount), unit="kg")
-    if unit_lower in ("l", "1l"):
-        return StandardUnitPrice(amount=_round2(amount), unit="L")
+    if word_lower in _EACH_WORDS:
+        if per == 1:
+            return StandardUnitPrice(amount=_round2(amount), unit="each")
+        return StandardUnitPrice(amount=_round4(amount / per), unit="each")
+    if word_lower in _KG_WORDS:
+        return StandardUnitPrice(amount=_round2(amount / per), unit="kg")
+    if word_lower in _L_WORDS:
+        return StandardUnitPrice(amount=_round2(amount / per), unit="L")
+    if word_lower in _G_WORDS:
+        return StandardUnitPrice(amount=_round2(amount * Decimal(1000) / per), unit="kg")
+    if word_lower in _ML_WORDS:
+        return StandardUnitPrice(amount=_round2(amount * Decimal(1000) / per), unit="L")
+    if word_lower in _SHEET_WORDS:
+        if name and _WIPE_NAME.search(name):
+            # Wipes are counted in "sheets" by Woolworths; one sheet is one wipe.
+            return StandardUnitPrice(amount=_round4(amount / per), unit="each")
+        return StandardUnitPrice(amount=_round4(amount * Decimal(100) / per), unit="100sheets")
 
-    # g -> kg: multiply by (1000 / grams_in_the_raw_unit)
-    grams_match = _GRAMS_PATTERN.match(unit_lower)
-    if grams_match:
-        grams = Decimal(grams_match.group(1))
-        if grams <= 0:
-            return None
-        rescaled = amount * (Decimal(1000) / grams)
-        return StandardUnitPrice(amount=_round2(rescaled), unit="kg")
-
-    # ml -> L: multiply by (1000 / ml_in_the_raw_unit)
-    ml_match = _ML_PATTERN.match(unit_lower)
-    if ml_match:
-        ml = Decimal(ml_match.group(1))
-        if ml <= 0:
-            return None
-        rescaled = amount * (Decimal(1000) / ml)
-        return StandardUnitPrice(amount=_round2(rescaled), unit="L")
-
-    # Unrecognised unit shape - unreadable, not guessed at.
+    # per wash, per metre, per 100 (capsules) and so on: not one of our four units.
     return None
 
 

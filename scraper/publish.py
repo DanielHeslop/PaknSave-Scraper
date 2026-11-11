@@ -25,6 +25,8 @@ import os
 import urllib.error
 import urllib.request
 
+from scraper.item_fields import build_item_fields
+
 MAILBOX_URL_ENV = "MAILBOX_URL"
 MAILBOX_TOKEN_ENV = "MAILBOX_TOKEN"
 TIMEOUT_SECONDS = 5
@@ -60,6 +62,7 @@ _UNIT_LABELS = {
     "ea": "ea",
     "each": "ea",
     "unit": "ea",
+    "100sheets": "per 100 sheets",
 }
 
 
@@ -145,6 +148,36 @@ def _fetch_excluded_keys(mailbox_url: str, mailbox_token: str) -> set[str] | Non
         return None
 
 
+def build_payload_item(p: dict) -> dict:
+    """One mailbox item: the original fields plus price/pack/promo fields.
+
+    price and unit are the per-unit price charged now (see scraper/item_fields.py);
+    pack_price/pack_count, regular_* and promo_* describe the pack and any deal.
+    """
+    fields = build_item_fields(p).payload
+    unit = fields["unit"]
+    item = {
+        "name": p["name"],
+        "price": fields["price"],
+        "unit": unit,
+        "unit_label": map_unit_label(unit),
+        **({"size": p["size"]} if p.get("size") is not None else {}),
+        # Defaults to "Pak'nSave" for pre-multi-chain callers/tests that
+        # don't set this field.
+        "supermarket": p.get("supermarket", "Pak'nSave"),
+        # Same stable ID already keyed into snapshots/price_history (see storage.py).
+        "product_id": p["product_id"],
+    }
+    for key, value in fields.items():
+        if key not in item:
+            item[key] = value
+    return item
+
+
+def build_payload_items(products: list[dict]) -> list[dict]:
+    return [build_payload_item(p) for p in products if p.get("price") is not None]
+
+
 def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> int:
     """Best-effort: send this run's priced products to the recipe app's mailbox.
 
@@ -155,6 +188,13 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> int:
     request body is:
 
         {"items": [{"name": ..., "price": <per-unit price for kg/L items, e.g. 2.29 for "$2.29/kg"; the shelf price itself for "each"/pack items>, "unit": "kg" | "L" | "each", "unit_label": "per kg" | "per L" | "ea" (map_unit_label() applied to "unit" - a purely additive, human-readable form; "unit" itself is untouched so nothing that already parses "unit" is affected), "size": "500g" / "ea" / "6pk" (omitted if unresolved), "supermarket": "Pak'nSave" | "Woolworths" | "New World", "product_id": the same stable per-chain ID already stored in snapshots/price_history for this item (Pak'nSave/New World: "P#######"; Woolworths: numeric sku as a string)}, ...]}
+
+    Since 2026-11-12 every item also carries pack_price, pack_count,
+    regular_price, regular_pack_price and, when they apply, promo_type,
+    promo_label, promo_ends, promo_min_qty, sheets_per_item, total_sheets and
+    unit_unparsed - all computed in scraper/item_fields.py. "unit" can now
+    also be "100sheets" (label "per 100 sheets"). The paragraph below
+    describes the original fields and still holds for kg and L items.
 
     "price" is product["unit_price"] when a real per-unit price is
     available (weight/volume items). "each"/pack items have no unit_price
@@ -209,27 +249,7 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> int:
         )
         return 0
 
-    payload = [
-        {
-            "name": p["name"],
-            "price": p["unit_price"] if p.get("unit_price") is not None else p["price"],
-            "unit": p["unit"] if p.get("unit") is not None else "each",
-            "unit_label": map_unit_label(p["unit"] if p.get("unit") is not None else "each"),
-            **({"size": p["size"]} if p.get("size") is not None else {}),
-            # Defaults to "Pak'nSave" for pre-multi-chain callers/tests that
-            # don't set this field - never invented for a record that
-            # actually came from elsewhere, since every real product dict is
-            # now tagged with its own chain at construction time.
-            "supermarket": p.get("supermarket", "Pak'nSave"),
-            # Same stable ID already keyed into snapshots/price_history for
-            # this item (see storage.py) - lets the receiving app dedupe by
-            # (supermarket, product_id) instead of by name, which breaks
-            # whenever a name-cleanup fix changes a product's stored name.
-            "product_id": p["product_id"],
-        }
-        for p in products
-        if p.get("price") is not None
-    ]
+    payload = build_payload_items(products)
 
     if not payload:
         print("Publishing to the recipe app skipped - no priced products this run.")

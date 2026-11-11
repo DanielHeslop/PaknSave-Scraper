@@ -333,3 +333,60 @@ if __name__ == "__main__":
     test_map_unit_label_leaves_unknown_and_per_100_unchanged()
     test_map_unit_label_empty_and_none_unchanged()
     print("All map_unit_label tests passed (run the rest via pytest - they need monkeypatch).")
+
+
+# --- new price / pack / promo fields -----------------------------------------
+
+
+def test_100sheets_unit_label():
+    from scraper.publish import map_unit_label
+
+    assert map_unit_label("100sheets") == "per 100 sheets"
+
+
+def test_every_item_carries_the_new_fields_and_keeps_the_old(monkeypatch):
+    products = [
+        {"product_id": "P1", "name": "Pams Value Toilet Tissue", "size": "12 x 180 sheets", "price": 2.89,
+         "unit_raw": "$0.13/100 sheets", "unit_price": None, "unit": None, "supermarket": "Pak'nSave"},
+        {"product_id": "P2", "name": "Brown Onions", "size": "kg", "price": 3.49, "unit_price": 3.49,
+         "unit": "kg", "supermarket": "New World"},
+    ]
+    items = _capture_published_body(monkeypatch, products)["items"]
+    tissue, onions = items
+    for key in ("name", "price", "unit", "unit_label", "size", "supermarket", "product_id",
+                "pack_price", "pack_count", "regular_price", "regular_pack_price"):
+        assert key in tissue and key in onions
+    assert tissue["unit"] == "100sheets" and tissue["unit_label"] == "per 100 sheets"
+    assert tissue["pack_count"] == 12 and tissue["pack_price"] == 2.89
+    assert tissue["total_sheets"] == 2160
+    assert (onions["price"], onions["unit"], onions["unit_label"]) == (3.49, "kg", "per kg")
+    assert onions["pack_count"] == 1 and onions["regular_price"] == 3.49
+    for key in ("promo_type", "promo_label", "promo_ends", "promo_min_qty", "unit_unparsed"):
+        assert key not in onions
+
+
+def test_promo_fields_are_sent(monkeypatch):
+    products = [{
+        "product_id": "P3", "name": "Paseo Pure Luxury 3ply", "size": "8 x 270 sheets", "price": 5.69,
+        "pack_price": 4.99, "regular_pack_price": 5.69, "promo_type": "sale", "promo_label": "Special",
+        "promo_ends": "2026-11-20", "unit_raw": "$0.26/100 sheets", "promo_unit_raw": "$0.23/100 sheets",
+        "unit_price": None, "unit": None, "supermarket": "Pak'nSave",
+    }]
+    item = _capture_published_body(monkeypatch, products)["items"][0]
+    assert item["promo_type"] == "sale" and item["promo_label"] == "Special"
+    assert item["promo_ends"] == "2026-11-20"
+    assert item["pack_price"] == 4.99 and item["regular_pack_price"] == 5.69
+    assert item["price"] < item["regular_price"]
+
+
+def test_unparsed_unit_text_is_sent(monkeypatch):
+    products = [{"product_id": "P4", "name": "Mystery Wash Tabs", "size": None, "price": 9.99,
+                 "unit_raw": "$0.40/wash", "unit_price": None, "unit": None, "supermarket": "New World"}]
+    item = _capture_published_body(monkeypatch, products)["items"][0]
+    assert item["unit"] == "each" and item["pack_count"] == 1 and item["unit_unparsed"] == "$0.40/wash"
+
+
+def test_item_without_a_price_is_still_left_out(monkeypatch):
+    from scraper.publish import build_payload_items
+
+    assert build_payload_items([{"product_id": "P5", "name": "x", "price": None, "supermarket": "New World"}]) == []

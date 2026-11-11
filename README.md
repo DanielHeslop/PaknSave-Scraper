@@ -94,6 +94,25 @@ Each item also carries a `unit_label` field - `map_unit_label()` in
 -> `"ea"`) - a purely additive, human-readable form for display, added
 identically across all three chains. `unit` itself is unchanged.
 
+Every item also carries the pack and promo fields (built by
+`scraper/item_fields.py`, with pack sizes read by `scraper/pack_size.py`):
+
+- `price` + `unit` (kg, L, each or 100sheets): the price of ONE single item
+  (one egg, one wipe, one roll) charged now. `unit_label` for 100sheets is
+  "per 100 sheets".
+- `pack_price` / `pack_count`: the price charged now for one pack, and how
+  many single items it holds (1 for a single item). Counts come only from
+  explicit text (subtitle, name, Woolworths packageType/volumeSize); if none
+  is found the item is sent as unit each with `pack_count` 1.
+- `regular_price` / `regular_pack_price`: the non-promo prices (equal to
+  `price` / `pack_price` when there is no promo).
+- `promo_type` ("sale", "member" or "multibuy"), `promo_label`, `promo_ends`,
+  `promo_min_qty`: present only when a promo shows. Multibuy ("2 for $5")
+  leaves `price` and `pack_price` at the regular values. Only public data
+  is used; nothing logs in.
+- `sheets_per_item` / `total_sheets`: only when actually known.
+- `unit_unparsed`: the store's own unit-price text when it could not be read.
+
 This is entirely optional and off by default. To turn it on, set two
 environment variables before running with `--save`:
 

@@ -117,3 +117,85 @@ if __name__ == "__main__":
         t()
         print(f"PASS: {t.__name__}")
     print("All unit_price.py tests passed.")
+
+
+# --- per-100-sheets and other formats found in the audit ---------------------
+
+
+def test_per_100_sheets_with_space_is_not_truncated():
+    result = parse_raw_unit_price("$0.26/100 sheets")
+    assert result is not None
+    assert (result.amount, result.unit) == (0.26, "100sheets")
+
+
+def test_per_100_sheets_pams_and_paper_towels():
+    for text, amount in [("$0.13/100 sheets", 0.13), ("$1.91/100 sheets", 1.91), ("$0.47/100 sheets", 0.47)]:
+        result = parse_raw_unit_price(text)
+        assert (result.amount, result.unit) == (amount, "100sheets")
+
+
+def test_100ss_maps_to_100sheets():
+    result = parse_raw_unit_price("$0.39/100ss")
+    assert (result.amount, result.unit) == (0.39, "100sheets")
+
+
+def test_sheet_counts_other_than_100_are_rescaled():
+    result = parse_raw_unit_price("$0.50/50 sheets")
+    assert (result.amount, result.unit) == (1.0, "100sheets")
+    result = parse_raw_unit_price("$1.00/200ss")
+    assert (result.amount, result.unit) == (0.5, "100sheets")
+
+
+def test_100ea_is_rescaled_to_one_each():
+    result = parse_raw_unit_price("$4.75/100ea")
+    assert (result.amount, result.unit) == (0.0475, "each")
+
+
+def test_per_each_variants():
+    for text in ["$0.12/ea", "$0.71/ea", "$0.12/1ea", "$0.12 per each", "$0.12/each"]:
+        result = parse_raw_unit_price(text)
+        assert result is not None, text
+        assert result.unit == "each"
+        assert result.amount == 0.12 or text.startswith("$0.71")
+
+
+def test_per_word_form_and_spaces():
+    result = parse_raw_unit_price("$1.64 per 1L")
+    assert (result.amount, result.unit) == (1.64, "L")
+    result = parse_raw_unit_price("$0.49 / 100 g")
+    assert (result.amount, result.unit) == (4.9, "kg")
+
+
+def test_millilitre_measure_still_parses():
+    result = parse_raw_unit_price("$0.40/10mL")
+    assert (result.amount, result.unit) == (40.0, "L")
+
+
+def test_bare_100_is_sheets_only_for_facial_tissue():
+    for name in ["Paseo Soft & Strong Tissues 200pk", "Kleenex Large & Thick Facial Tissue", "Sorbent Silky White Tissues"]:
+        result = parse_raw_unit_price("$0.95/100", name)
+        assert result is not None, name
+        assert (result.amount, result.unit) == (0.95, "100sheets")
+
+
+def test_bare_100_for_other_products_stays_unparsed():
+    assert parse_raw_unit_price("$37.18/100", "Surf Laundry Capsules 50pk") is None
+    assert parse_raw_unit_price("$0.95/100", "Pams Toilet Tissue 12pk") is None
+    assert parse_raw_unit_price("$0.95/100", "Handee Paper Towels") is None
+    assert parse_raw_unit_price("$0.95/100", "Huggies Baby Wipes") is None
+    assert parse_raw_unit_price("$0.95/100") is None
+
+
+def test_formats_that_fit_no_unit_stay_unparsed():
+    for text in ["$0.80/wash", "$1.20/metre", "$2.10/m", "$0.40/10", "", "no price here"]:
+        assert parse_raw_unit_price(text) is None, text
+
+
+def test_wipes_counted_in_sheets_are_priced_per_wipe():
+    result = parse_raw_unit_price("$8.84/100ss", "silk personal wipes flushable")
+    assert (result.amount, result.unit) == (0.0884, "each")
+
+
+def test_toilet_paper_in_sheets_is_not_treated_as_wipes():
+    result = parse_raw_unit_price("$0.39/100ss", "cotton softs toilet paper 3ply mega")
+    assert result.unit == "100sheets"

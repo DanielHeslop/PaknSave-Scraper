@@ -28,6 +28,8 @@ from playwright.async_api import ElementHandle
 
 from scraper.unit_price import parse_raw_unit_price
 
+_LIMIT_PATTERN = re.compile(r"limit\s+\d+[^\n]*", re.IGNORECASE)
+
 PRODUCT_TILE_TESTID_PATTERN = re.compile(r"-(EA|KGM)-000")
 
 
@@ -54,6 +56,82 @@ async def find_product_tiles(page) -> list[ElementHandle]:
         if test_id and PRODUCT_TILE_TESTID_PATTERN.search(test_id):
             tiles.append(div)
     return tiles
+
+
+def _money(dollar_text: str, cent_text: str) -> float | None:
+    """"8." + "89" -> 8.89. The promo badge writes dollars with a trailing dot."""
+    dollars = re.sub(r"\D", "", dollar_text or "")
+    cents = re.sub(r"\D", "", cent_text or "")
+    if not dollars or not cents:
+        return None
+    try:
+        return float(f"{dollars}.{cents}")
+    except ValueError:
+        return None
+
+
+async def _text_of(root, testid: str) -> str:
+    try:
+        el = await root.query_selector(f'[data-testid="{testid}"]')
+        if el is None:
+            return ""
+        return (await el.inner_text()).strip()
+    except Exception:
+        return ""
+
+
+async def _price_in(root) -> float | None:
+    return _money(await _text_of(root, "price-dollars"), await _text_of(root, "price-cents"))
+
+
+async def _read_promo(tile: ElementHandle) -> dict:
+    """Promo badge on a Foodstuffs tile (the "decal"), from public tile markup only.
+
+    Returns {} when there is no priced badge. Keys: promo_price, promo_unit_raw,
+    promo_type ("sale" | "member" | "multibuy"), promo_label, promo_min_qty.
+    """
+    try:
+        decal = await tile.query_selector('[data-testid="decal"]')
+    except Exception:
+        return {}
+    if decal is None:
+        return {}
+
+    promo: dict = {}
+    promo_unit = await _text_of(decal, "complex-promo-unit-price")
+    if promo_unit:
+        promo["promo_unit_raw"] = promo_unit
+
+    badge = ""
+    try:
+        badge_el = await tile.query_selector('[aria-label^="Badge,"]')
+        if badge_el is not None:
+            badge = ((await badge_el.get_attribute("aria-label")) or "").replace("Badge,", "").strip()
+    except Exception:
+        pass
+    limit_match = _LIMIT_PATTERN.search(await _text_of(decal, "promo-product-limit"))
+    limit = limit_match.group(0).strip() if limit_match else ""
+
+    threshold = await _text_of(decal, "multibuy-threshold")
+    if threshold:
+        multibuy_price = await _price_in(await decal.query_selector('[data-testid="multibuy-price"]') or decal)
+        qty_match = re.match(r"\s*(\d+)", threshold)
+        if multibuy_price is None or not qty_match:
+            return {}
+        promo["promo_type"] = "multibuy"
+        promo["promo_price"] = multibuy_price
+        promo["promo_min_qty"] = int(qty_match.group(1))
+        promo["promo_label"] = f"{threshold.strip()} ${multibuy_price:.2f}"
+        return promo
+
+    promo_price = await _price_in(await decal.query_selector('[data-testid="decal-price"]') or decal)
+    if promo_price is None:
+        return {}
+    promo["promo_price"] = promo_price
+    promo["promo_type"] = "member" if "club" in badge.lower() else "sale"
+    label = badge if badge and not badge.lower().endswith(" badge") else "Special"
+    promo["promo_label"] = f"{label} - {limit}" if limit else label
+    return promo
 
 
 async def _get_product_id(tile: ElementHandle) -> str | None:
@@ -120,7 +198,10 @@ async def extract_product(
     # genuinely unreadable for this product - which is grounds to drop it
     # (a product with no price at all fails the later sanity check anyway).
     price: float | None = None
-    if dollar_text and cent_text:
+    shelf_el = await tile.query_selector('[data-testid="price"]')
+    if shelf_el is not None:
+        price = await _price_in(shelf_el)
+    if price is None and dollar_text and cent_text:
         try:
             price = float(f"{dollar_text}.{cent_text}")
         except ValueError:
@@ -134,16 +215,37 @@ async def extract_product(
     # "Each" items with nothing to compare per-unit) - not a drop reason.
     unit_price: float | None = None
     unit: str | None = None
-    for p in reversed(p_elements):
-        try:
-            text = await p.inner_text()
-        except Exception:
-            continue
-        parsed = parse_raw_unit_price(text)
+    unit_raw = ""
+    regular_unit_el = await tile.query_selector('[data-testid="non-promo-unit-price"]')
+    if regular_unit_el is not None:
+        unit_raw = (await regular_unit_el.inner_text()).strip()
+        parsed = parse_raw_unit_price(unit_raw, name)
         if parsed is not None:
             unit_price = parsed.amount
             unit = parsed.unit
-            break
+    else:
+        for p in reversed(p_elements):
+            try:
+                text = await p.inner_text()
+            except Exception:
+                continue
+            parsed = parse_raw_unit_price(text, name)
+            if parsed is not None:
+                unit_raw = text.strip()
+                unit_price = parsed.amount
+                unit = parsed.unit
+                break
+
+    promo = await _read_promo(tile)
+    pack_price = price
+    if promo:
+        promo_price = promo.pop("promo_price")
+        if promo["promo_type"] == "multibuy":
+            pass
+        elif promo_price < price:
+            pack_price = promo_price
+        else:
+            promo = {}
 
     return ExtractResult(
         product={
@@ -155,6 +257,13 @@ async def extract_product(
             "unit_price": unit_price,
             "unit": unit,
             "scraped_at": scraped_at,
+            # Raw inputs for scraper/item_fields.py: the store's own unit text
+            # and the price actually charged now (promo price on a sale or
+            # member deal; the regular price otherwise, including multibuy).
+            "unit_raw": unit_raw,
+            "pack_price": pack_price,
+            "regular_pack_price": price,
+            **promo,
             # Defaults to "Pak'nSave" (see the supermarket param above) so
             # run.py, search_run.py, and weekly_combined.py - none of which
             # pass this arg - keep tagging their output exactly as before.
