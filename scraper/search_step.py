@@ -214,12 +214,23 @@ def log_outcome(outcome: SearchOutcome) -> None:
 
 
 def summary_line(
-    products_published: int, outcome: SearchOutcome, categories_scraped: int, seconds: float
+    products_published: int,
+    outcome: SearchOutcome,
+    categories_scraped: int,
+    seconds: float,
+    mapping: dict | None = None,
 ) -> str:
+    """The one-line run summary. `mapping` (mapped / new / not_found counts) adds the watch-category part."""
     minutes, secs = divmod(int(seconds), 60)
+    watch = ""
+    if mapping is not None:
+        watch = (
+            f"watch categories mapped {mapping['mapped']}, newly mapped {mapping['new']}, "
+            f"not found {mapping['not_found']}, "
+        )
     return (
         f"SUMMARY: products published {products_published}, terms searched {len(outcome.searched)}, "
         f"found {len(outcome.found)}, not found {len(outcome.not_found)}, skipped {len(outcome.skipped)}, "
-        f"categories scraped {categories_scraped}, matcher {outcome.matcher}, "
+        f"categories scraped {categories_scraped}, {watch}matcher {outcome.matcher}, "
         f"found via fallback key {len(outcome.via)}, run time {minutes}m{secs:02d}s"
     )

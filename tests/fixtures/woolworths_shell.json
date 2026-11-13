@@ -1,0 +1,478 @@
+{
+ "mainNavs": [
+  {
+   "url": "/",
+   "label": "Home",
+   "navigationItems": []
+  },
+  {
+   "url": "/shop/browse/departments",
+   "label": "Browse",
+   "navigationItems": [
+    {
+     "label": "Department",
+     "items": [
+      {
+       "id": 8,
+       "label": "Pantry",
+       "url": "/shop/browse/pantry",
+       "dasFacets": [
+        {
+         "key": "8",
+         "value": "62",
+         "isBooleanValue": false,
+         "name": "Tinned Foods & Packets",
+         "productCount": 564,
+         "shelfResponses": [
+          {
+           "id": 173,
+           "label": "Tinned Fruit",
+           "url": "tinned-fruit"
+          },
+          {
+           "id": 174,
+           "label": "Tinned Salmon",
+           "url": "tinned-salmon"
+          },
+          {
+           "id": 175,
+           "label": "Tinned Tuna & Seafood",
+           "url": "tinned-tuna-seafood"
+          },
+          {
+           "id": 176,
+           "label": "Tinned Soup & Soup Mix",
+           "url": "tinned-soup-soup-mix"
+          },
+          {
+           "id": 177,
+           "label": "Baked Beans & Spaghetti",
+           "url": "baked-beans-spaghetti"
+          },
+          {
+           "id": 178,
+           "label": "Tinned Tomatoes",
+           "url": "tinned-tomatoes"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "8",
+         "value": "63",
+         "isBooleanValue": false,
+         "name": "Baking",
+         "productCount": 472,
+         "shelfResponses": [
+          {
+           "id": 697,
+           "label": "Flour",
+           "url": "flour"
+          },
+          {
+           "id": 698,
+           "label": "Sugar & Sweeteners",
+           "url": "sugar-sweeteners"
+          },
+          {
+           "id": 699,
+           "label": "Yeast & Raising Agents",
+           "url": "yeast-raising-agents"
+          },
+          {
+           "id": 700,
+           "label": "Icing & Cake Decorating",
+           "url": "icing-cake-decorating"
+          },
+          {
+           "id": 701,
+           "label": "Cake, Pancake & Dessert Mix",
+           "url": "cake-pancake-dessert-mix"
+          },
+          {
+           "id": 702,
+           "label": "Flavouring, Essence & Food Colouring",
+           "url": "flavouring-essence-food-colouring"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "8",
+         "value": "68",
+         "isBooleanValue": false,
+         "name": "Oil, Vinegar & Condiments",
+         "productCount": 411,
+         "shelfResponses": [
+          {
+           "id": 193,
+           "label": "Oil",
+           "url": "oil"
+          },
+          {
+           "id": 194,
+           "label": "Vinegar",
+           "url": "vinegar"
+          },
+          {
+           "id": 195,
+           "label": "Dressings",
+           "url": "dressings"
+          },
+          {
+           "id": 196,
+           "label": "Mayonnaise",
+           "url": "mayonnaise"
+          },
+          {
+           "id": 197,
+           "label": "Chutney & Pickle",
+           "url": "chutney-pickle"
+          },
+          {
+           "id": 198,
+           "label": "Mustard & Horseradish",
+           "url": "mustard-horseradish"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "8",
+         "value": "74",
+         "isBooleanValue": false,
+         "name": "Bulk Foods",
+         "productCount": 31,
+         "shelfResponses": [
+          {
+           "id": 507,
+           "label": "Nuts & Seeds",
+           "url": "nuts-seeds"
+          },
+          {
+           "id": 508,
+           "label": "Dried Fruit & Mixes",
+           "url": "dried-fruit-mixes"
+          },
+          {
+           "id": 510,
+           "label": "Confectionery",
+           "url": "confectionery"
+          }
+         ],
+         "group": "Aisle"
+        }
+       ],
+       "promoTiles": [
+        {
+         "id": 266,
+         "title": "Beer & Wine Member Price MMT",
+         "navigationUrl": "https://www.woolworths.co.nz/shop/products/member-prices?search=&dynamicGroup=memberprices&page=1&size=48&sort=BrowseRelevance&dasFilter=Department;8;Beer%20%26%20Wine;false;Department&inStockProductsOnly=true",
+         "imageLink": "https://www.woolworths.co.nz/content/F26-MMT-MemberPrice.jpg",
+         "order": 4,
+         "active": true,
+         "startDate": "2025-12-29T00:00:00",
+         "endDate": "2099-01-25T23:59:00",
+         "qlcode": null
+        }
+       ]
+      },
+      {
+       "id": 12,
+       "label": "Household",
+       "url": "/shop/browse/household",
+       "dasFacets": [
+        {
+         "key": "12",
+         "value": "46",
+         "isBooleanValue": false,
+         "name": "Bathroom",
+         "productCount": 110,
+         "shelfResponses": [
+          {
+           "id": 169,
+           "label": "Toilet Paper",
+           "url": "toilet-paper"
+          },
+          {
+           "id": 170,
+           "label": "Toilet & Bathroom Cleaners",
+           "url": "toilet-bathroom-cleaners"
+          },
+          {
+           "id": 171,
+           "label": "Bathroom Accessories",
+           "url": "bathroom-accessories"
+          },
+          {
+           "id": 172,
+           "label": "Tissues & Wipes",
+           "url": "tissues-wipes"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "12",
+         "value": "47",
+         "isBooleanValue": false,
+         "name": "Kitchen",
+         "productCount": 410,
+         "shelfResponses": [
+          {
+           "id": 342,
+           "label": "Dishwashing",
+           "url": "dishwashing"
+          },
+          {
+           "id": 343,
+           "label": "Paper Towels",
+           "url": "paper-towels"
+          },
+          {
+           "id": 344,
+           "label": "Clingfilm, Foil & Baking Paper",
+           "url": "clingfilm-foil-baking-paper"
+          },
+          {
+           "id": 345,
+           "label": "Sandwich, Oven & Freezer Bags",
+           "url": "sandwich-oven-freezer-bags"
+          },
+          {
+           "id": 346,
+           "label": "Cooking & Baking Equipment",
+           "url": "cooking-baking-equipment"
+          },
+          {
+           "id": 347,
+           "label": "Food Storage Containers",
+           "url": "food-storage-containers"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "12",
+         "value": "49",
+         "isBooleanValue": false,
+         "name": "Cleaning",
+         "productCount": 327,
+         "shelfResponses": [
+          {
+           "id": 255,
+           "label": "Sponges, Wipes & Gloves",
+           "url": "sponges-wipes-gloves"
+          },
+          {
+           "id": 256,
+           "label": "Mops, Buckets & Brooms",
+           "url": "mops-buckets-brooms"
+          },
+          {
+           "id": 257,
+           "label": "Air Fresheners",
+           "url": "air-fresheners"
+          },
+          {
+           "id": 258,
+           "label": "Disinfectant & Bleach",
+           "url": "disinfectant-bleach"
+          },
+          {
+           "id": 259,
+           "label": "Drain Cleaners & Solvents",
+           "url": "drain-cleaners-solvents"
+          },
+          {
+           "id": 260,
+           "label": "Floor & Carpet Cleaners",
+           "url": "floor-carpet-cleaners"
+          }
+         ],
+         "group": "Aisle"
+        }
+       ],
+       "promoTiles": [
+        {
+         "id": 27,
+         "title": "Baby & Child Specials",
+         "navigationUrl": "/shop/specials/baby-child",
+         "imageLink": "https://www.countdown.co.nz/content/MM-specials-baby-child.jpg",
+         "order": 2,
+         "active": true,
+         "startDate": "2025-11-10T00:00:00",
+         "endDate": "2099-01-18T23:59:00",
+         "qlcode": null
+        }
+       ]
+      },
+      {
+       "id": 13,
+       "label": "Baby & Child",
+       "url": "/shop/browse/baby-child",
+       "dasFacets": [
+        {
+         "key": "13",
+         "value": "126",
+         "isBooleanValue": false,
+         "name": "Nappies & Wipes",
+         "productCount": 211,
+         "shelfResponses": [
+          {
+           "id": 687,
+           "label": "Newborn Nappies (Up To 5kg)",
+           "url": "newborn-nappies-up-to-5kg-"
+          },
+          {
+           "id": 688,
+           "label": "Infant Nappies (4-8kg)",
+           "url": "infant-nappies-4-8kg-"
+          },
+          {
+           "id": 689,
+           "label": "Crawler Nappies (6-11kg)",
+           "url": "crawler-nappies-6-11kg-"
+          },
+          {
+           "id": 690,
+           "label": "Toddler Nappies (10-15kg)",
+           "url": "toddler-nappies-10-15kg-"
+          },
+          {
+           "id": 691,
+           "label": "Walker Nappies (13-18kg)",
+           "url": "walker-nappies-13-18kg-"
+          },
+          {
+           "id": 692,
+           "label": "Junior Nappies (16kg+)",
+           "url": "junior-nappies-16kg-"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "13",
+         "value": "127",
+         "isBooleanValue": false,
+         "name": "Baby Food",
+         "productCount": 204,
+         "shelfResponses": [
+          {
+           "id": 284,
+           "label": "Baby Food 4 Months+",
+           "url": "baby-food-4-months-"
+          },
+          {
+           "id": 285,
+           "label": "Baby Food 6 Months+",
+           "url": "baby-food-6-months-"
+          },
+          {
+           "id": 286,
+           "label": "Baby Food 8 Months+",
+           "url": "baby-food-8-months-"
+          },
+          {
+           "id": 287,
+           "label": "Baby Food 12 Months+",
+           "url": "baby-food-12-months-"
+          },
+          {
+           "id": 288,
+           "label": "Baby & Toddler Snacks",
+           "url": "baby-toddler-snacks"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "13",
+         "value": "128",
+         "isBooleanValue": false,
+         "name": "Formula",
+         "productCount": 59,
+         "shelfResponses": [
+          {
+           "id": 270,
+           "label": "Newborn (0-6m)",
+           "url": "newborn-0-6m-"
+          },
+          {
+           "id": 271,
+           "label": "Follow on (6-12m)",
+           "url": "follow-on-6-12m-"
+          },
+          {
+           "id": 272,
+           "label": "Toddler (12m+)",
+           "url": "toddler-12m-"
+          },
+          {
+           "id": 273,
+           "label": "Junior (2 yrs+)",
+           "url": "junior-2-yrs-"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "13",
+         "value": "129",
+         "isBooleanValue": false,
+         "name": "Bottles, Toys & Accessories",
+         "productCount": 180,
+         "shelfResponses": [
+          {
+           "id": 523,
+           "label": "Bottles & Baby Feeding",
+           "url": "bottles-baby-feeding"
+          },
+          {
+           "id": 524,
+           "label": "Teething",
+           "url": "teething"
+          },
+          {
+           "id": 525,
+           "label": "Bathtime & Accessories",
+           "url": "bathtime-accessories"
+          },
+          {
+           "id": 526,
+           "label": "Baby Toys",
+           "url": "baby-toys"
+          }
+         ],
+         "group": "Aisle"
+        },
+        {
+         "key": "13",
+         "value": "130",
+         "isBooleanValue": false,
+         "name": "For Mum",
+         "productCount": 6,
+         "shelfResponses": [
+          {
+           "id": 489,
+           "label": "Nursing",
+           "url": "nursing"
+          }
+         ],
+         "group": "Aisle"
+        }
+       ],
+       "promoTiles": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "url": "/recipes",
+   "label": "Recipes",
+   "navigationItems": []
+  }
+ ]
+}

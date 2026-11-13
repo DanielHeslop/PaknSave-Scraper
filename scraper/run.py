@@ -25,6 +25,7 @@ from datetime import date, datetime, timezone
 
 from scraper.browser import (
     SITES,
+    CategoryPage,
     PageLoadTimeout,
     navigate_and_wait_ready,
     new_pinned_context,
@@ -118,8 +119,12 @@ async def scrape_all(
     headed: bool,
     site: str = DEFAULT_SITE,
     guard: RobotsGuard | None = None,
+    extra_pages: list[CategoryPage] | None = None,
 ) -> dict:
     """Run the full scrape and return a results dict with products and stats.
+
+    `extra_pages` are scraped after the categories file's pages (the caller has
+    already left out any the file lists) - used for the mapped watch categories.
 
     `site` selects which chain's store to pin to and which supermarket tag
     to write onto each product (scraper.browser.SITES). Defaults to
@@ -129,7 +134,7 @@ async def scrape_all(
     site_config = SITES[site]
     guard = guard or RobotsGuard()
     overrides = load_overrides(overrides_path)
-    category_pages = parse_categories_file(categories_path)
+    category_pages = parse_categories_file(categories_path) + list(extra_pages or [])
 
     if not category_pages:
         log(f"No categories found in {categories_path} - nothing to scrape.")

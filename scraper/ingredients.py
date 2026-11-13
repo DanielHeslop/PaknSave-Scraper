@@ -91,6 +91,22 @@ def _normalise_term(term: str) -> str:
 
 
 @dataclass(frozen=True)
+class WatchCategory:
+    """One watch category from the app: a name, plus the store paths it already knows.
+
+    paths maps a store ("paknsave", "newworld", "woolworths") to that store's
+    category path; a store may be missing or blank. A plain-string watch category
+    has no paths at all.
+    """
+
+    name: str
+    paths: dict[str, str] = field(default_factory=dict)
+
+    def path_for(self, store: str) -> str:
+        return (self.paths.get(store) or "").strip()
+
+
+@dataclass(frozen=True)
 class StoreLists:
     """One store's lists from the app's ingredient-list endpoint (?store=<store>).
 
@@ -104,10 +120,15 @@ class StoreLists:
     search_terms: list[str] = field(default_factory=list)
     watch_terms: list[str] = field(default_factory=list)
     watch_categories: list[str] = field(default_factory=list)
+    watch_category_entries: list[WatchCategory] = field(default_factory=list)
     skip: frozenset[str] = frozenset()
 
     def is_skipped(self, term: str) -> bool:
         return _normalise_term(term) in self.skip
+
+    def watch_category_specs(self) -> list[WatchCategory]:
+        """The watch categories with whatever paths the app gave (names only if it gave none)."""
+        return self.watch_category_entries or [WatchCategory(name) for name in self.watch_categories]
 
 
 def _store_url(url: str, store: str, action: str | None = None) -> str:
@@ -147,6 +168,32 @@ def _string_list(value, what: str) -> list[str]:
     return out
 
 
+def _watch_categories(value) -> list[WatchCategory]:
+    """watch.categories: plain strings and/or {"name": ..., "paths": {store: path}} objects."""
+    if not isinstance(value, list):
+        raise ValueError("watch.categories is not a list")
+    out: list[WatchCategory] = []
+    seen: set[str] = set()
+    for item in value:
+        paths: dict[str, str] = {}
+        if isinstance(item, dict):
+            name = item.get("name")
+            raw_paths = item.get("paths") or {}
+            if not isinstance(raw_paths, dict):
+                raise ValueError("watch.categories has an entry whose paths is not an object")
+            paths = {str(k): v.strip() for k, v in raw_paths.items() if isinstance(v, str) and v.strip()}
+        else:
+            name = item
+        if not isinstance(name, str):
+            raise ValueError("watch.categories has an entry that is not a category")
+        name = name.strip()
+        key = _normalise_term(name)
+        if name and key not in seen:
+            seen.add(key)
+            out.append(WatchCategory(name, paths))
+    return out
+
+
 def fetch_store_lists(
     store: str, url: str = DEFAULT_INGREDIENT_LIST_URL, timeout: int = TIMEOUT_SECONDS
 ) -> StoreLists | None:
@@ -172,11 +219,13 @@ def fetch_store_lists(
             watch = {}
         if not isinstance(watch, dict):
             raise ValueError("watch is not an object")
+        watch_entries = _watch_categories(watch.get("categories") or [])
         return StoreLists(
             store=store,
             search_terms=_string_list(data.get("search") or [], "search"),
             watch_terms=_string_list(watch.get("terms") or [], "watch.terms"),
-            watch_categories=_string_list(watch.get("categories") or [], "watch.categories"),
+            watch_categories=[entry.name for entry in watch_entries],
+            watch_category_entries=watch_entries,
             skip=frozenset(_normalise_term(t) for t in _string_list(data.get("skip") or [], "skip")),
         )
     except urllib.error.HTTPError as e:

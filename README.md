@@ -226,6 +226,32 @@ source it and stop with a clear message if it is missing. See `env.example`.
 `run_daily.sh` (category scrape only, `scraper.run`) and `run_weekly.sh` (which
 now runs the same weekly job as above) still work by hand but are not in cron.
 
+## Category trees and watch categories
+
+Each run first sends the store's category list to the app, then maps the app's
+watch categories onto it.
+
+- **Trees.** Pak'nSave and New World: the category sitemap named in
+  `ecomsitemap_index.xml` (the same sitemap robots.txt points to). Woolworths:
+  the navigation the site itself loads (`/api/v1/shell`: departments, aisles,
+  shelves). Only paths robots.txt allows are kept. Each tree is cached in
+  `data/category_trees/<store>.json` and posted to `<site>/api/store-categories`
+  (Bearer `MAILBOX_TOKEN`) only when it changed since the last successful post.
+  A failed post is retried next run. Nothing is posted on a dry run.
+- **Manual post.** `python -m scraper.post_categories --site <store>`. Add
+  `--dry-run` to read and report without posting or caching, and `--map` to
+  also show how the watch categories map for that store.
+- **Mapping.** For each watch category: the path the app gives for this store
+  is used as it is. If the path is blank, or the category is a plain name, the
+  store's cached tree is searched by name: exact, then normalised (case,
+  `&`/`and`, plurals, "canned"/"tinned"), then closest by words. No match logs
+  `watch category 'X' not found at <store>` and the category is skipped.
+  Mappings are kept in `data/category_maps/<store>.json`.
+- **Scraping.** Mapped categories are scraped on that store's run, after the
+  categories file, leaving out any path the file already lists (one page each).
+- **Summary.** The run's `SUMMARY:` line ends its category part with
+  `watch categories mapped N, newly mapped N, not found N`.
+
 ## Adding a new category to scrape
 
 Open `categories.txt` and add a line with the category page's URL. For example:

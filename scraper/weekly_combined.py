@@ -29,9 +29,10 @@ import time
 from datetime import date
 from pathlib import Path
 
+from scraper.category_mapping import MappingResult, extra_foodstuffs_pages, sync_and_map
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.publish import publish_to_mailbox
-from scraper.browser import SITES
+from scraper.browser import SITES, parse_categories_file
 from scraper.robots import RobotsGuard
 from scraper.run import DEFAULT_HISTORY_PATH, DEFAULT_OVERRIDES_PATH, resolve_site_defaults, scrape_all
 from scraper.run import print_summary as print_category_summary
@@ -139,10 +140,30 @@ async def main_async(args: argparse.Namespace) -> int:
     guard = RobotsGuard()
 
     log("\n" + "=" * 60)
+    log("STEP 0: CATEGORY TREE AND WATCH CATEGORIES")
+    log("=" * 60)
+    lists = _FETCH_LATER
+    try:
+        lists = fetch_store_lists(store, args.ingredient_list_url)
+    except Exception as e:
+        log(f"Could not fetch the app's list up front ({type(e).__name__}) - the search step will try again.")
+    mapping: MappingResult | None = None
+    extra_pages = []
+    try:
+        mapping = sync_and_map(store, None if lists is _FETCH_LATER else lists, save=args.save, guard=guard)
+        if mapping:
+            extra_pages = extra_foodstuffs_pages(store, mapping.mapped, parse_categories_file(args.categories))
+            log(f"{len(extra_pages)} mapped watch categor(ies) to scrape beyond the categories file.")
+    except Exception as e:
+        log(f"Watch category step failed ({type(e).__name__}: {e}) - carrying on without it.")
+
+    log("\n" + "=" * 60)
     log("STEP 1: CATEGORY SCRAPE")
     log("=" * 60)
     try:
-        category_result = await scrape_all(args.categories, args.overrides, args.headed, args.site, guard)
+        category_result = await scrape_all(
+            args.categories, args.overrides, args.headed, args.site, guard, extra_pages=extra_pages
+        )
     except Exception as e:
         log(f"UNEXPECTED ERROR during category scrape - stopping run: {e!r}")
         return 1
@@ -164,7 +185,7 @@ async def main_async(args: argparse.Namespace) -> int:
     log("=" * 60)
     outcome = SearchOutcome()
     try:
-        outcome = run_search_step(args, store, category_products, scraped_categories)
+        outcome = run_search_step(args, store, category_products, scraped_categories, lists)
     except Exception as e:
         log(f"Search step failed ({type(e).__name__}: {e}) - carrying on to publish.")
 
@@ -183,21 +204,39 @@ async def main_async(args: argparse.Namespace) -> int:
         log("Dry run - nothing published.")
 
     print(f"Ingredients matched         : {len(outcome.found)}")
-    log(summary_line(published, outcome, len(scraped_categories), time.monotonic() - started))
+    log(
+        summary_line(
+            published,
+            outcome,
+            len(scraped_categories),
+            time.monotonic() - started,
+            mapping.counts() if mapping else None,
+        )
+    )
     return 0
 
 
-def run_search_step(args, store: str, products: list[dict], scraped_categories: dict) -> SearchOutcome:
-    """Fetch the app's list for this store, match it (app matcher, local backup), report the result."""
+_FETCH_LATER = object()
+
+
+def run_search_step(
+    args, store: str, products: list[dict], scraped_categories: dict, lists=_FETCH_LATER
+) -> SearchOutcome:
+    """Match the app's list for this store (app matcher, local backup) and report the result.
+
+    `lists` is the list already fetched at the start of the run (None if the app
+    couldn't be reached); by default it is fetched here.
+    """
     deadline = time.monotonic() + SEARCH_TIME_BUDGET_SECONDS
-    lists = fetch_store_lists(store, args.ingredient_list_url)
+    if lists is _FETCH_LATER:
+        lists = fetch_store_lists(store, args.ingredient_list_url)
     if lists is None:
         return SearchOutcome()
 
     terms, skipped = plan_terms(lists)
     log(
         f"App list for {store}: {len(lists.search_terms)} search term(s), {len(lists.watch_terms)} watch term(s), "
-        f"{len(lists.watch_categories)} watch categor(ies) {lists.watch_categories} (scraped via the categories file), "
+        f"{len(lists.watch_categories)} watch categor(ies) {lists.watch_categories} (scraped via the categories file, plus the ones mapped at this store), "
         f"{len(skipped)} skipped."
     )
     scraped_words: set[str] = set()

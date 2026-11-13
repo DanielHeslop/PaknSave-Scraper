@@ -1,7 +1,10 @@
 """Entry point for the Woolworths NZ scrape, in three steps:
 
-  1. Browse: every path in woolworths_categories.txt (the watch categories) is
-     read through the public browse API.
+  0. Category tree: the store's categories (departments, aisles, shelves) are
+     sent to the app when they changed, and the app's watch categories are
+     mapped onto them by name (or the path the app gives).
+  1. Browse: every path in woolworths_categories.txt, plus the mapped watch
+     categories, is read through the public browse API.
   2. Search: the app's list for this store (GET ?store=woolworths) gives the terms;
      each is looked up through the public product-search API with a short delay
      between terms, time-boxed to about 20 minutes. The app's matcher
@@ -29,6 +32,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from scraper.category_mapping import MAPPED_PAGES, Mapping, MappingResult, covers_for, label_for, sync_and_map
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.matching import match_products
@@ -148,6 +152,18 @@ def parse_categories_file(path: str | Path) -> list[BrowsePage]:
     return pages
 
 
+def extra_browse_pages(mapped: list[Mapping], existing: list[BrowsePage]) -> list[BrowsePage]:
+    """Browse pages for mapped watch categories, leaving out any the categories file already reads."""
+    have = {page.path for page in existing}
+    pages = []
+    for m in mapped:
+        if m.path in have:
+            continue
+        have.add(m.path)
+        pages.append(BrowsePage(m.path, label_for(m), covers_for(m), MAPPED_PAGES))
+    return pages
+
+
 def _keep_valid(products: list[dict], dropped: list[str]) -> list[dict]:
     kept = []
     for product in products:
@@ -264,9 +280,17 @@ def apply_app_matcher(outcome: SearchOutcome, products: list[dict]) -> SearchOut
     return rebuilt
 
 
-def run_search_step(args, browse_products_list: list[dict] | None = None) -> tuple[SearchOutcome, list[str]]:
+_FETCH_LATER = object()
+
+
+def run_search_step(
+    args, browse_products_list: list[dict] | None = None, lists=_FETCH_LATER
+) -> tuple[SearchOutcome, list[str]]:
+    """`lists` is the list already fetched at the start of the run (None if the app
+    couldn't be reached); by default it is fetched here."""
     deadline = time.monotonic() + SEARCH_TIME_BUDGET_SECONDS
-    lists = fetch_store_lists(STORE, args.ingredient_list_url)
+    if lists is _FETCH_LATER:
+        lists = fetch_store_lists(STORE, args.ingredient_list_url)
     reportable = lists is not None
     skipped: list[str] = []
     if lists is None:
@@ -350,9 +374,27 @@ def main() -> int:
     if not args.save:
         log("(Dry Run Mode - nothing is written, published or reported. Pass --save to do it for real.)")
 
+    log("\nSTEP 0: CATEGORY TREE AND WATCH CATEGORIES")
+    lists = _FETCH_LATER
+    try:
+        lists = fetch_store_lists(STORE, args.ingredient_list_url)
+    except Exception as e:
+        log(f"Could not fetch the app's list up front ({type(e).__name__}) - the search step will try again.")
+    mapping: MappingResult | None = None
+    pages = []
+    try:
+        pages = parse_categories_file(args.categories)
+        mapping = sync_and_map(STORE, None if lists is _FETCH_LATER else lists, save=args.save)
+        if mapping:
+            extra = extra_browse_pages(mapping.mapped, pages)
+            log(f"{len(extra)} mapped watch categor(ies) to browse beyond the categories file.")
+            pages = pages + extra
+    except Exception as e:
+        log(f"Watch category step failed ({type(e).__name__}: {e}) - carrying on without it.")
+
     log("\nSTEP 1: BROWSE (watch categories)")
     try:
-        browse = browse_all(parse_categories_file(args.categories))
+        browse = browse_all(pages)
     except Exception as e:
         log(f"UNEXPECTED ERROR - stopping run: {e!r}")
         return 1
@@ -371,7 +413,7 @@ def main() -> int:
     log("\nSTEP 2: SEARCH (product-search API)")
     outcome = SearchOutcome()
     try:
-        outcome, blocked = run_search_step(args, browse_products_list)
+        outcome, blocked = run_search_step(args, browse_products_list, lists)
         stats["terms_blocked"] = stats["terms_blocked"] + blocked
     except Exception as e:
         log(f"Search step failed ({type(e).__name__}: {e}) - carrying on to publish.")
@@ -403,7 +445,15 @@ def main() -> int:
         log("Dry run - nothing published.")
 
     print(f"Ingredients matched         : {len(outcome.found)}")
-    log(summary_line(published, outcome, stats["categories_scraped"], time.monotonic() - started))
+    log(
+        summary_line(
+            published,
+            outcome,
+            stats["categories_scraped"],
+            time.monotonic() - started,
+            mapping.counts() if mapping else None,
+        )
+    )
     return 0
 
 

@@ -49,6 +49,8 @@ import requests
 from scraper.robots import RobotsDisallowed, RobotsGuard
 
 BASE_URL = "https://www.woolworths.co.nz/api/v1/products"
+SITE_ROOT = "https://www.woolworths.co.nz"
+SHELL_URL = SITE_ROOT + "/api/v1/shell"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -412,3 +414,12 @@ def get_product_description_text(stock_code: str) -> str | None:
     elif claims:
         parts.append(str(claims))
     return "\n".join(parts)
+
+
+def get_navigation() -> dict:
+    """The site's own navigation data (departments, aisles, shelves) from /api/v1/shell.
+
+    One throttled request through the same robots-checked, retrying path as every
+    other Woolworths call.
+    """
+    return _get_with_retry(_new_session(), SHELL_URL).json()
