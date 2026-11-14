@@ -27,6 +27,7 @@ from scraper.category_mapping import (
 )
 from scraper.category_tree import Category, build_foodstuffs_tree, build_woolworths_tree, sitemap_locs
 from scraper.ingredients import StoreLists, WatchCategory, fetch_store_lists
+from scraper.price_runs import RunResult
 from scraper.robots import RobotsRules
 from scraper.search_step import SearchOutcome, summary_line
 
@@ -300,7 +301,7 @@ def test_weekly_run_scrapes_mapped_categories_and_summarises_them(monkeypatch, t
     )
     monkeypatch.setattr(weekly_combined, "scrape_all", fake_scrape_all)
     monkeypatch.setattr(weekly_combined, "fetch_store_lists", lambda store, url: lists)
-    monkeypatch.setattr(weekly_combined, "publish_to_mailbox", lambda products, **kw: len(products))
+    monkeypatch.setattr(weekly_combined, "publish_run", lambda products, *a, **kw: RunResult(items=len(products)))
     monkeypatch.setattr(weekly_combined, "report_outcome", lambda store, outcome: None)
     monkeypatch.setattr(category_tree, "fetch_tree", lambda store, guard=None: _foodstuffs())
     args = weekly_combined.parse_args(["--save"])
@@ -356,7 +357,7 @@ def test_woolworths_run_browses_mapped_categories(monkeypatch, tmp_path, capsys)
     monkeypatch.setattr(woolworths, "browse_products", fake_browse)
     monkeypatch.setattr(woolworths, "search_products", lambda t, size: ([], []))
     monkeypatch.setattr(woolworths, "fetch_store_lists", lambda store, url: lists)
-    monkeypatch.setattr(woolworths, "publish_to_mailbox", lambda products, dry_run=False: len(products))
+    monkeypatch.setattr(woolworths, "publish_run", lambda products, *a, **kw: RunResult(items=len(products)))
     monkeypatch.setattr(woolworths, "report_outcome", lambda store, o: None)
     monkeypatch.setattr(woolworths, "_enrich_sheets", lambda products, save: None)
     monkeypatch.setattr(category_tree, "fetch_tree", lambda store, guard=None: _woolworths())

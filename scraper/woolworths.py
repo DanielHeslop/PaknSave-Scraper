@@ -32,11 +32,11 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from scraper.category_mapping import MAPPED_PAGES, Mapping, MappingResult, covers_for, label_for, sync_and_map
+from scraper.category_mapping import Mapping, MappingResult, covers_for, label_for, sync_and_map
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.matching import match_products
-from scraper.publish import publish_to_mailbox
+from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
 from scraper.robots import RobotsDisallowed
 from scraper.search_step import (
     SEARCH_TIME_BUDGET_SECONDS,
@@ -92,6 +92,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--ingredient-list-url", default=DEFAULT_INGREDIENT_LIST_URL)
     parser.add_argument("--snapshots-dir", default=DEFAULT_SNAPSHOTS_DIR)
     parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH)
+    parser.add_argument(
+        "--legacy-mailbox",
+        action="store_true",
+        help="Post to the old mailbox instead of /api/price-runs (fallback only).",
+    )
     parser.add_argument(
         "--size",
         type=int,
@@ -160,7 +165,7 @@ def extra_browse_pages(mapped: list[Mapping], existing: list[BrowsePage]) -> lis
         if m.path in have:
             continue
         have.add(m.path)
-        pages.append(BrowsePage(m.path, label_for(m), covers_for(m), MAPPED_PAGES))
+        pages.append(BrowsePage(m.path, label_for(m), covers_for(m), DEFAULT_BROWSE_MAX_PAGES))
     return pages
 
 
@@ -393,6 +398,7 @@ def main() -> int:
         log(f"Watch category step failed ({type(e).__name__}: {e}) - carrying on without it.")
 
     log("\nSTEP 1: BROWSE (watch categories)")
+    scraped_at = now_nz_iso()
     try:
         browse = browse_all(pages)
     except Exception as e:
@@ -406,6 +412,7 @@ def main() -> int:
     if args.save and browse_products_list:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(browse_products_list, args.snapshots_dir, today)
+        write_scrape_meta(snapshot_path, scraped_at)
         _, new_entries = update_price_history(browse_products_list, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
@@ -428,17 +435,27 @@ def main() -> int:
     print_table(to_publish)
     print_summary(stats)
     published = 0
+    run_status = None
     if args.save:
         extra = [p for p in outcome.matched_products if p not in browse_products_list]
         if extra:
             try:
                 today = date.today().isoformat()
-                write_snapshot(to_publish, args.snapshots_dir, today)
+                write_scrape_meta(write_snapshot(to_publish, args.snapshots_dir, today), scraped_at)
                 update_price_history(extra, args.history_path)
             except Exception as e:
                 log(f"Could not update snapshot/history with search results ({type(e).__name__}: {e}).")
         try:
-            published = publish_to_mailbox(to_publish) or 0
+            snapshot = Path(args.snapshots_dir) / f"{date.today().isoformat()}.json"
+            run = publish_run(
+                to_publish,
+                STORE,
+                scraped_at,
+                legacy=args.legacy_mailbox,
+                snapshot_path=snapshot if snapshot.exists() else None,
+            )
+            published = run.items
+            run_status = run.summary()
         except Exception as e:
             log(f"Publishing failed ({type(e).__name__}: {e}).")
     else:
@@ -452,6 +469,7 @@ def main() -> int:
             stats["categories_scraped"],
             time.monotonic() - started,
             mapping.counts() if mapping else None,
+            run_status,
         )
     )
     return 0

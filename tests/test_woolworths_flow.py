@@ -4,6 +4,7 @@ import pytest
 
 from scraper import woolworths
 from scraper.ingredients import StoreLists
+from scraper.price_runs import RunResult
 from scraper.woolworths_transport import BotDetected, browse_url_filters
 
 
@@ -93,7 +94,7 @@ def _run_main(monkeypatch, tmp_path, *, search_raises=False, save=True):
             raise RuntimeError("list exploded")
         return lists
     monkeypatch.setattr(woolworths, "fetch_store_lists", getter)
-    monkeypatch.setattr(woolworths, "publish_to_mailbox", lambda products, dry_run=False: published.append(products) or len(products))
+    monkeypatch.setattr(woolworths, "publish_run", lambda products, *a, **kw: published.append(products) or RunResult(items=len(products)))
     monkeypatch.setattr(woolworths, "report_outcome", lambda store, o: reported.append((store, list(o.found), o.not_found)))
     cats = tmp_path / "c.txt"; cats.write_text("pantry/baking\n")
     argv = ["--categories", str(cats), "--snapshots-dir", str(tmp_path / "snap"), "--history-path", str(tmp_path / "h.json")]

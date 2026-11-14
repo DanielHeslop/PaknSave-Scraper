@@ -11,8 +11,9 @@ search step, then publish - in that order.
      disallowed by robots.txt, so nothing is requested from them. Found /
      not-found is reported back to the app. Time-boxed; a failure here is
      logged and never stops step 3.
-  3. Publish: the de-duplicated products go to the mailbox. Runs even if
-     step 2 failed.
+  3. Publish: the de-duplicated products are posted to the app as one run
+     (POST /api/price-runs, in parts - scraper/price_runs.py). Runs even if
+     step 2 failed. --legacy-mailbox posts to the old mailbox instead.
 
 Default mode is a DRY RUN: nothing is written, published or reported (the
 would-be reports are printed instead). Pass --save to do it for real.
@@ -31,7 +32,7 @@ from pathlib import Path
 
 from scraper.category_mapping import MappingResult, extra_foodstuffs_pages, sync_and_map
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
-from scraper.publish import publish_to_mailbox
+from scraper.price_runs import now_nz_iso, post_snapshot_file, publish_run, write_scrape_meta
 from scraper.browser import SITES, parse_categories_file
 from scraper.robots import RobotsGuard
 from scraper.run import DEFAULT_HISTORY_PATH, DEFAULT_OVERRIDES_PATH, resolve_site_defaults, scrape_all
@@ -83,11 +84,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH)
     parser.add_argument("--ingredient-list-url", default=DEFAULT_INGREDIENT_LIST_URL)
     parser.add_argument(
+        "--legacy-mailbox",
+        action="store_true",
+        help="Post to the old mailbox instead of /api/price-runs (fallback only).",
+    )
+    parser.add_argument(
         "--publish-snapshot",
         metavar="PATH",
         default=None,
-        help="Publish an already-written category snapshot (e.g. "
-        "data/snapshots/2026-10-03.json) to the mailbox without re-scraping, then exit - "
+        help="Post an already-written category snapshot (e.g. "
+        "data/snapshots/2026-10-03.json) to the app as a run without re-scraping, then exit - "
         "for recovering a run where Part 1's snapshot/history were already written but "
         "the job failed before publishing (e.g. a Part 2 ingredient-list fetch failure). "
         "Runs the same publish path and scrape-exclusions filtering as a normal --save "
@@ -97,33 +103,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return resolve_site_defaults(parser.parse_args(argv))
 
 
-def publish_snapshot_file(path: str, save: bool) -> int:
-    """Load a previously-written snapshot JSON file and publish it to the
-    mailbox (through the same publish_to_mailbox path - and so the same
-    scrape-exclusions filtering - as a normal run), without re-scraping.
+def publish_snapshot_file(path: str, save: bool, store: str = "paknsave", legacy: bool = False) -> int:
+    """Post a previously-written snapshot JSON file as a run (the same path, run id and
+    scrape-exclusions filtering as a normal run), without re-scraping.
 
-    Dry run by default: reports counts only, never POSTs. Pass save=True to
-    actually publish.
+    Dry run by default: shows the run's id, parts and sizes, posts nothing. Pass
+    save=True to actually post.
     """
-    snapshot_path = Path(path)
-    try:
-        raw = snapshot_path.read_text()
-    except FileNotFoundError:
-        log(f"Snapshot not found: {snapshot_path}")
+    result = post_snapshot_file(path, store, dry_run=not save, legacy=legacy)
+    if result is None:
         return 1
-
-    try:
-        products = json.loads(raw)
-    except json.JSONDecodeError as e:
-        log(f"Snapshot at {snapshot_path} is not valid JSON: {e}")
-        return 1
-
-    if not isinstance(products, list):
-        log(f"Snapshot at {snapshot_path} is not a JSON array of products.")
-        return 1
-
-    log(f"Loaded {len(products)} product(s) from {snapshot_path}")
-    publish_to_mailbox(products, dry_run=not save)
+    if save:
+        log(f"SUMMARY: {result.summary() or 'nothing posted'}")
     return 0
 
 
@@ -173,9 +164,12 @@ async def main_async(args: argparse.Namespace) -> int:
     print_category_summary(category_result["stats"])
     scraped_categories = category_result.get("scraped_categories", {})
 
+    scraped_at = category_result.get("scraped_at") or now_nz_iso()
+    snapshot_path = None
     if args.save:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(dedupe_products(category_products), args.snapshots_dir, today)
+        write_scrape_meta(snapshot_path, scraped_at)
         _, new_entries = update_price_history(category_products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
@@ -195,9 +189,14 @@ async def main_async(args: argparse.Namespace) -> int:
     to_publish = dedupe_products(category_products + outcome.matched_products)
     log(f"{len(to_publish)} unique product(s) after de-duplicating by product id.")
     published = 0
+    run_status = None
     if args.save:
         try:
-            published = publish_to_mailbox(to_publish) or 0
+            run = publish_run(
+                to_publish, store, scraped_at, legacy=args.legacy_mailbox, snapshot_path=snapshot_path
+            )
+            published = run.items
+            run_status = run.summary()
         except Exception as e:
             log(f"Publishing failed ({type(e).__name__}: {e}).")
     else:
@@ -211,6 +210,7 @@ async def main_async(args: argparse.Namespace) -> int:
             len(scraped_categories),
             time.monotonic() - started,
             mapping.counts() if mapping else None,
+            run_status,
         )
     )
     return 0
@@ -259,7 +259,7 @@ def run_search_step(
 def main() -> None:
     args = parse_args()
     if args.publish_snapshot:
-        sys.exit(publish_snapshot_file(args.publish_snapshot, args.save))
+        sys.exit(publish_snapshot_file(args.publish_snapshot, args.save, args.site, args.legacy_mailbox))
     exit_code = asyncio.run(main_async(args))
     sys.exit(exit_code)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -132,6 +132,13 @@ class CategoryPage:
     # optional covers= setting); used to decide which search terms a
     # category could answer for - see scraper/search_step.py.
     covers: tuple[str, ...] = ()
+    # Mapped watch categories are followed page by page (?pg=2, 3, ...) up to
+    # max_pages, stopping at the first short or repeated page. Pages listed in
+    # the categories file are already expanded by pages=N and keep max_pages 1.
+    page: int = 1
+    max_pages: int = 1
+    first_page_tiles: int = 0
+    seen_ids: set = field(default_factory=set, repr=False, compare=False)
 
 
 def parse_categories_file(path: str | Path) -> list[CategoryPage]:

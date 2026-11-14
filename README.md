@@ -113,7 +113,8 @@ Every item also carries the pack and promo fields (built by
 - `sheets_per_item` / `total_sheets`: only when actually known.
 - `unit_unparsed`: the store's own unit-price text when it could not be read.
 
-This is entirely optional and off by default. To turn it on, set two
+(This section describes the item fields and the legacy mailbox; normal runs now
+use the price runs described below.) This is entirely optional and off by default. To turn it on, set two
 environment variables before running with `--save`:
 
 ```bash
@@ -132,6 +133,45 @@ full success. `data/snapshots/` and `data/price_history.json` are written
 first and are always the real record, whether or not this last step
 works. A dry run (no `--save`) never sends anything, ever.
 
+## Price runs (`/api/price-runs`)
+
+Each `--save` run is posted to `POST <site>/api/price-runs` (`<site>` is the
+origin of `MAILBOX_URL`, Bearer `MAILBOX_TOKEN`). The old mailbox is no longer
+used unless you pass `--legacy-mailbox` (to `scraper.run`, `weekly_combined`,
+`woolworths` or `post_run`).
+
+- **runId** = `<store>-<scrape date>-<10 hex chars of a hash of the items>`. The
+  same items on the same day always give the same runId, so a re-post replaces
+  the stored parts instead of adding a second run.
+- **Parts**: at most 1,000 items and 2 MB each. Items are sorted before they are
+  split, so part boundaries are stable.
+- **Posted one at a time**, in order, never in parallel (the app can't safely
+  update its run list from two parts at once). Each part gets 3 tries with a
+  short back-off; only network errors and 408/425/429/5xx are retried.
+- **scrapedAt** is the real scrape time (NZ time with offset), written beside
+  each snapshot as `<date>.meta.json`. Snapshots from before that existed use
+  the file's modified time.
+- **After the last part**, the run is checked with `GET ?index`. If it isn't
+  listed as complete, `GET ?index&rebuild=1` is called once and checked again.
+- **Missing parts** are saved in `data/pending_runs/` and retried at the start of
+  the next run for that store. Or run it by hand:
+
+```bash
+python -m scraper.post_run --site newworld                   # latest snapshot
+python -m scraper.post_run --site paknsave --date 2026-11-08 # a given day
+python -m scraper.post_run --site woolworths --dry-run       # runId, parts, sizes only
+```
+
+The `SUMMARY:` line ends with `run posted (parts N/N, index complete)` or
+`run failed (missing parts 2, 3)`. Posting never fails the scrape; local
+snapshots and price history are written first and stay the real record.
+
+**Watch categories read every page.** Mapped watch categories are followed page
+by page with the same delays and robots.txt checks as the main lists, up to 5
+pages. Pak'nSave / New World stop on an empty page, a page with nothing new, or
+a page shorter than the first. Woolworths uses its browse API (120 per page, up
+to 5 pages). They are still de-duplicated with the main lists.
+
 ## Weekly run: categories, search, publish
 
 Each chain has one weekly job (cron: Wednesday Woolworths, Friday New World,
@@ -141,7 +181,8 @@ publish step runs even if the search step fails:
 1. **Category scrape**, including the "watch" categories (bulk foods, kitchen
    and bathroom cleaners, stock, gravy, spices, spreads, toothpaste and so on).
 2. **Search step** (time-boxed to about 20 minutes).
-3. **Publish** to the recipe app's mailbox, de-duplicated by product id.
+3. **Publish** the run to the app (`POST <site>/api/price-runs`), de-duplicated
+   by product id. See "Price runs" below.
 
 ```bash
 python -m scraper.weekly_combined                    # Pak'nSave, dry run

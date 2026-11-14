@@ -15,8 +15,10 @@ from __future__ import annotations
 import asyncio
 import json
 
+import scraper.price_runs as price_runs
 import scraper.weekly_combined as weekly_combined
 from scraper.ingredients import StoreLists
+from scraper.price_runs import RunResult
 from scraper.weekly_combined import main_async, parse_args, publish_snapshot_file
 
 _CATEGORY_PRODUCTS = [
@@ -73,7 +75,9 @@ def _patch(monkeypatch, lists, published, reports):
     monkeypatch.setattr(weekly_combined, "scrape_all", _fake_scrape_all)
     monkeypatch.setattr(weekly_combined, "fetch_store_lists", lambda store, url: lists)
     monkeypatch.setattr(
-        weekly_combined, "publish_to_mailbox", lambda products, **kw: published.append(products) or len(products)
+        weekly_combined,
+        "publish_run",
+        lambda products, *a, **kw: published.append(products) or RunResult(items=len(products)),
     )
     monkeypatch.setattr(
         weekly_combined, "report_outcome", lambda store, outcome: reports.append((store, outcome))
@@ -148,9 +152,9 @@ def test_publish_snapshot_file_dry_run_reports_counts_without_posting(monkeypatc
 
     posted = []
     monkeypatch.setattr(
-        weekly_combined,
-        "publish_to_mailbox",
-        lambda products, dry_run=False: posted.append((products, dry_run)),
+        price_runs,
+        "publish_run",
+        lambda products, store, scraped_at, dry_run=False, **kw: posted.append((products, dry_run)) or RunResult(),
     )
 
     exit_code = publish_snapshot_file(str(snapshot_path), save=False)
@@ -165,9 +169,9 @@ def test_publish_snapshot_file_save_actually_publishes(monkeypatch, tmp_path):
 
     posted = []
     monkeypatch.setattr(
-        weekly_combined,
-        "publish_to_mailbox",
-        lambda products, dry_run=False: posted.append((products, dry_run)),
+        price_runs,
+        "publish_run",
+        lambda products, store, scraped_at, dry_run=False, **kw: posted.append((products, dry_run)) or RunResult(),
     )
 
     exit_code = publish_snapshot_file(str(snapshot_path), save=True)
@@ -179,3 +183,36 @@ def test_publish_snapshot_file_save_actually_publishes(monkeypatch, tmp_path):
 def test_publish_snapshot_file_missing_file_returns_error(tmp_path):
     exit_code = publish_snapshot_file(str(tmp_path / "does-not-exist.json"), save=False)
     assert exit_code == 1
+
+
+def test_scrape_time_from_the_category_scrape_is_what_the_run_is_posted_with(monkeypatch, tmp_path):
+    seen = []
+
+    async def scrape_with_time(*args, **kwargs):
+        result = await _fake_scrape_all()
+        result["scraped_at"] = "2026-11-08T08:01:02+13:00"
+        return result
+
+    _patch(monkeypatch, _lists(), [], [])
+    monkeypatch.setattr(weekly_combined, "scrape_all", scrape_with_time)
+    monkeypatch.setattr(
+        weekly_combined,
+        "publish_run",
+        lambda products, store, scraped_at, **kw: seen.append((store, scraped_at, kw.get("legacy"))) or RunResult(),
+    )
+
+    assert asyncio.run(main_async(_base_args(tmp_path))) == 0
+    assert seen == [("paknsave", "2026-11-08T08:01:02+13:00", False)]
+
+
+def test_legacy_mailbox_flag_reaches_publish_run(monkeypatch, tmp_path):
+    seen = []
+    _patch(monkeypatch, _lists(), [], [])
+    monkeypatch.setattr(
+        weekly_combined,
+        "publish_run",
+        lambda products, store, scraped_at, **kw: seen.append(kw.get("legacy")) or RunResult(),
+    )
+    args = _base_args(tmp_path, legacy_mailbox=True)
+    assert asyncio.run(main_async(args)) == 0
+    assert seen == [True]

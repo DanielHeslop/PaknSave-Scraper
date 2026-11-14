@@ -219,8 +219,10 @@ def summary_line(
     categories_scraped: int,
     seconds: float,
     mapping: dict | None = None,
+    run_status: str | None = None,
 ) -> str:
-    """The one-line run summary. `mapping` (mapped / new / not_found counts) adds the watch-category part."""
+    """The one-line run summary. `mapping` (mapped / new / not_found counts) adds the watch-category part;
+    `run_status` ("run posted (parts 3/3, index complete)" or "run failed (missing parts 2)") is added at the end."""
     minutes, secs = divmod(int(seconds), 60)
     watch = ""
     if mapping is not None:
@@ -233,4 +235,5 @@ def summary_line(
         f"found {len(outcome.found)}, not found {len(outcome.not_found)}, skipped {len(outcome.skipped)}, "
         f"categories scraped {categories_scraped}, {watch}matcher {outcome.matcher}, "
         f"found via fallback key {len(outcome.via)}, run time {minutes}m{secs:02d}s"
+        + (f", {run_status}" if run_status else "")
     )

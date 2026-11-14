@@ -20,8 +20,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import dataclasses
 import sys
-from datetime import date, datetime, timezone
+from datetime import date
 
 from scraper.browser import (
     SITES,
@@ -35,7 +36,7 @@ from scraper.browser import (
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
 from scraper.overrides import get_override, load_overrides
-from scraper.publish import publish_to_mailbox
+from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
 from scraper.robots import RobotsGuard
 from scraper.storage import update_price_history, write_snapshot
 from scraper.unit_price import derive_from_size_and_price
@@ -82,6 +83,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--overrides", default=DEFAULT_OVERRIDES_PATH)
     parser.add_argument("--snapshots-dir", default=None)
     parser.add_argument("--history-path", default=DEFAULT_HISTORY_PATH)
+    parser.add_argument(
+        "--legacy-mailbox",
+        action="store_true",
+        help="Post to the old mailbox instead of /api/price-runs (fallback only).",
+    )
     args = parser.parse_args(argv)
     return resolve_site_defaults(args)
 
@@ -138,7 +144,7 @@ async def scrape_all(
 
     if not category_pages:
         log(f"No categories found in {categories_path} - nothing to scrape.")
-        return {"products": [], "stats": _empty_stats(), "scraped_categories": {}}
+        return {"products": [], "stats": _empty_stats(), "scraped_categories": {}, "scraped_at": now_nz_iso()}
 
     log(f"{len(category_pages)} page(s) to be scraped.")
 
@@ -148,6 +154,7 @@ async def scrape_all(
     robots_skipped: list[str] = []
     scraped_categories: dict[str, tuple[str, ...]] = {}  # label -> covers, for categories with a page that loaded
     scraped_at = date.today().isoformat()
+    scraped_at_nz = now_nz_iso()
 
     # stealth_playwright() (scraper/browser.py) wraps async_playwright() with
     # playwright-stealth, so every browser/context/page opened below - the
@@ -170,7 +177,10 @@ async def scrape_all(
         page = await context.new_page()
 
         loaded_any = False
-        for i, category_page in enumerate(category_pages, start=1):
+        i = 0
+        while i < len(category_pages):
+            category_page = category_pages[i]
+            i += 1
             log(f"\n[{i}/{len(category_pages)}] {category_page.category} - {category_page.url}")
             if not guard.allows(category_page.url):
                 skipped_pages.append(category_page.url)
@@ -190,6 +200,7 @@ async def scrape_all(
             tiles = await find_product_tiles(page)
             log(f"  {len(tiles)} product tile(s) found")
 
+            page_ids: set[str] = set()
             for tile in tiles:
                 result: ExtractResult = await extract_product(
                     tile, category_page.category, scraped_at, site_config.supermarket
@@ -213,6 +224,11 @@ async def scrape_all(
                     continue
 
                 products.append(product)
+                page_ids.add(product["product_id"])
+
+            next_page = _next_page(category_page, len(tiles), page_ids)
+            if next_page is not None:
+                category_pages.insert(i, next_page)
 
         await browser.close()
 
@@ -227,7 +243,26 @@ async def scrape_all(
         "products_without_unit_price": sum(1 for p in products if p["unit_price"] is None),
         "products_dropped": dropped_reasons,
     }
-    return {"products": products, "stats": stats, "scraped_categories": scraped_categories}
+    return {"products": products, "stats": stats, "scraped_categories": scraped_categories, "scraped_at": scraped_at_nz}
+
+
+def _next_page(page: CategoryPage, tile_count: int, page_ids: set[str]) -> CategoryPage | None:
+    """The page after this one, for a mapped watch category that is followed page by page.
+
+    None when the category isn't paged this way, the limit is reached, the page was
+    empty, held nothing new, or was shorter than the first page (so the last page).
+    """
+    if page.max_pages <= page.page or tile_count == 0:
+        return None
+    first = page.first_page_tiles or tile_count
+    new_ids = page_ids - page.seen_ids
+    page.seen_ids.update(page_ids)
+    if not new_ids or tile_count < first:
+        return None
+    base_url = page.url.split("?")[0]
+    return dataclasses.replace(
+        page, url=f"{base_url}?pg={page.page + 1}", page=page.page + 1, first_page_tiles=first
+    )
 
 
 def _empty_stats() -> dict:
@@ -300,6 +335,7 @@ async def main_async(args: argparse.Namespace) -> int:
     if args.save:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(products, args.snapshots_dir, today)
+        write_scrape_meta(snapshot_path, result["scraped_at"])
         _, new_entries = update_price_history(products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
@@ -307,7 +343,10 @@ async def main_async(args: argparse.Namespace) -> int:
         # Best-effort only, and only after the local files above are already
         # written - those are the real record regardless of whether this
         # succeeds. Never runs during a dry run.
-        publish_to_mailbox(products)
+        run = publish_run(
+            products, args.site, result["scraped_at"], legacy=args.legacy_mailbox, snapshot_path=snapshot_path
+        )
+        log(f"SUMMARY: {run.summary() or 'nothing posted'}")
 
     return 0
 

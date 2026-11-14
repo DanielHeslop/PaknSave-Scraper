@@ -29,7 +29,10 @@ from scraper.category_tree import Category, log
 from scraper.ingredients import WatchCategory
 from scraper.matching import _stem
 
-MAPPED_PAGES = 1
+# Page limit for a mapped watch category at Pak'nSave / New World: the same limit
+# Woolworths uses for its main lists (DEFAULT_BROWSE_MAX_PAGES), above the 3 pages
+# the largest categories file entry asks for. Paging stops earlier at the last page.
+MAPPED_FOODSTUFFS_MAX_PAGES = 5
 
 _STOPWORDS = {"and", "the", "of", "a", "for", "in", "with", "food", "product", "supply"}
 # Extra words that turn a category into something else ("Dairy Free & Meat Free" is not "dairy").
@@ -271,7 +274,11 @@ def extra_foodstuffs_pages(store: str, mapped: list[Mapping], existing: list[Cat
             continue
         have.add(m.path)
         url = f"{_site_root(store)}/shop/category/{urllib.parse.quote(m.path, safe='/_-')}"
-        pages.append(CategoryPage(url=url, category=label_for(m), covers=covers_for(m)))
+        pages.append(
+            CategoryPage(
+                url=url, category=label_for(m), covers=covers_for(m), max_pages=MAPPED_FOODSTUFFS_MAX_PAGES
+            )
+        )
     return pages
 
 

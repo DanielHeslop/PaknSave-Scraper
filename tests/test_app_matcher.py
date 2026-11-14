@@ -16,6 +16,7 @@ import scraper.weekly_combined as weekly_combined
 from scraper import woolworths
 from scraper.app_matcher import AppMatchError, match_terms
 from scraper.ingredients import StoreLists
+from scraper.price_runs import RunResult
 from scraper.search_step import (
     SearchOutcome,
     category_words,
@@ -247,7 +248,7 @@ def _run_weekly(monkeypatch, tmp_path):
     monkeypatch.setattr(weekly_combined, "scrape_all", fake_scrape)
     monkeypatch.setattr(weekly_combined, "fetch_store_lists", lambda s, u: StoreLists(
         store="paknsave", search_terms=["tamari", "carrots", "saffron"], watch_terms=["onion"]))
-    monkeypatch.setattr(weekly_combined, "publish_to_mailbox", lambda p, **k: published.append(p) or len(p))
+    monkeypatch.setattr(weekly_combined, "publish_run", lambda p, *a, **k: published.append(p) or RunResult(items=len(p)))
     monkeypatch.setattr(weekly_combined, "report_outcome", lambda s, o: reports.append((s, o)))
     args = parse_args(["--save"])
     args.snapshots_dir, args.history_path = tmp_path / "snap", tmp_path / "h.json"
