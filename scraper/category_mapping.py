@@ -16,10 +16,11 @@ run can tell what is newly mapped.
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import urllib.parse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from scraper.browser import CategoryPage, parse_categories_file
 from scraper.category_tree import Category, log
 from scraper.ingredients import WatchCategory
 from scraper.matching import _stem
-from scraper.store_category import foodstuffs_path_of  # noqa: F401 (re-exported)
+from scraper.store_category import foodstuffs_path_of, is_promotional  # noqa: F401 (foodstuffs_path_of re-exported)
 
 # Page limit for a mapped watch category at Pak'nSave / New World: the same limit
 # Woolworths uses for its main lists (DEFAULT_BROWSE_MAX_PAGES), above the 3 pages
@@ -38,8 +39,6 @@ MAPPED_FOODSTUFFS_MAX_PAGES = 5
 _STOPWORDS = {"and", "the", "of", "a", "for", "in", "with", "food", "product", "supply"}
 # Extra words that turn a category into something else ("Dairy Free & Meat Free" is not "dairy").
 _NEGATING = {"free", "less", "without", "non"}
-# Promotional trees duplicate real categories under another path.
-_PROMO_ROOTS = {"featured"}
 _WORD_SYNONYMS = {"canned": "tinned", "can": "tin", "cans": "tin", "tins": "tin"}
 
 
@@ -116,7 +115,7 @@ def find_by_name(name: str, categories: list[Category]) -> tuple[Category, str] 
         return next((i for i, w in enumerate(ordered) if w in above), len(ordered))
 
     def pick(candidates: list[Category]) -> Category:
-        return min(candidates, key=lambda c: (c.path.split("/")[0] in _PROMO_ROOTS, depth(c), context(c), c.path))
+        return min(candidates, key=lambda c: (is_promotional(c.path), depth(c), context(c), c.path))
 
     wanted_plain = _plain(name)
     exact = [c for c in categories if c.name.lower() == name.strip().lower()]
@@ -147,7 +146,7 @@ def find_by_name(name: str, categories: list[Category]) -> tuple[Category, str] 
             extra = len(wanted - words) + 1
         else:
             continue
-        key = (c.path.split("/")[0] in _PROMO_ROOTS, extra, depth(c), context(c), c.path)
+        key = (is_promotional(c.path), extra, depth(c), context(c), c.path)
         if best is None or key < best[0]:
             best = (key, c)
     if best:
@@ -264,7 +263,13 @@ def label_paths(store: str, categories_file: str | Path | None = None) -> dict[s
     for record in load_mappings(store).values():
         label = re.sub(r"[^a-z0-9]+", "-", record["name"].lower()).strip("-") or record["path"].rsplit("/", 1)[-1]
         found.setdefault(label, set()).add(record["path"])
-    return {label: next(iter(paths)) for label, paths in found.items() if len(paths) == 1}
+    out = {}
+    for label, paths in found.items():
+        real = {p for p in paths if not is_promotional(p)}
+        paths = real or paths
+        if len(paths) == 1:
+            out[label] = next(iter(paths))
+    return out
 
 
 def add_categories_from_labels(products: list[dict], store: str, categories_file: str | Path | None = None) -> tuple[list[dict], int]:
@@ -282,6 +287,86 @@ def add_categories_from_labels(products: list[dict], store: str, categories_file
             filled += 1
         out.append(product)
     return out, filled
+
+
+# --- checking a categories file against the cached tree ----------------------
+
+MIN_REPLACEMENT_SIMILARITY = 0.75  # last-level name similarity (0-1) for a replacement to be considered
+REPLACEMENT_MARGIN = 0.1  # the best candidate must beat the next one by this much to be "clear"
+
+
+@dataclass
+class CategoriesFileCheck:
+    in_tree: list[str] = field(default_factory=list)
+    fixed: list[tuple[str, str]] = field(default_factory=list)  # (path in the file, replacement in the tree)
+    unresolved: list[str] = field(default_factory=list)  # in the file, not in the tree, no clear replacement
+
+
+def suggest_replacement(path: str, tree_paths: set[str]) -> str | None:
+    """The one tree path that is clearly this path's new name: same parent (so the same top level) and nearly the same last name."""
+    parent, _, name = path.rpartition("/")
+    if not parent or parent not in tree_paths:
+        return None
+    scored = sorted(
+        (
+            (difflib.SequenceMatcher(None, name, other.rpartition("/")[2]).ratio(), other)
+            for other in tree_paths
+            if other.rpartition("/")[0] == parent and other != path
+        ),
+        reverse=True,
+    )
+    if not scored or scored[0][0] < MIN_REPLACEMENT_SIMILARITY:
+        return None
+    if len(scored) > 1 and scored[0][0] - scored[1][0] < REPLACEMENT_MARGIN:
+        return None
+    return scored[0][1]
+
+
+def woolworths_file_paths(categories_file: str | Path) -> list[str]:
+    """The browse paths of woolworths_categories.txt (first word of each non-comment line)."""
+    try:
+        lines = Path(categories_file).read_text().splitlines()
+    except OSError:
+        return []
+    return [clean_path(line.split()[0]) for line in lines if line.strip() and not line.lstrip().startswith("#")]
+
+
+def check_categories_file(categories_file: str | Path, categories: list[Category], store: str = "paknsave") -> CategoriesFileCheck:
+    """Every distinct page path in a store's categories file, against the store's cached tree."""
+    if store == "woolworths":
+        found = woolworths_file_paths(categories_file)
+    else:
+        found = [foodstuffs_path_of(page.url) for page in parse_categories_file(categories_file)]
+    tree_paths = {c.path for c in categories}
+    check = CategoriesFileCheck()
+    for path in dict.fromkeys(found):
+        if path in tree_paths:
+            check.in_tree.append(path)
+            continue
+        replacement = suggest_replacement(path, tree_paths)
+        if replacement:
+            check.fixed.append((path, replacement))
+        else:
+            check.unresolved.append(path)
+    return check
+
+
+def apply_replacements(categories_file: str | Path, replacements: dict[str, str]) -> int:
+    """Rewrite the page URLs of a categories file whose path is a key of replacements. Returns how many lines changed."""
+    path = Path(categories_file)
+    lines, changed = [], 0
+    for line in path.read_text().splitlines(keepends=True):
+        parts = line.split(None, 1)
+        if parts and not line.lstrip().startswith("#") and "://" in parts[0]:
+            old = foodstuffs_path_of(parts[0])
+            if old in replacements:
+                new_url = parts[0].replace(old, replacements[old], 1)
+                if new_url != parts[0]:
+                    line = line.replace(parts[0], new_url, 1)
+                    changed += 1
+        lines.append(line)
+    path.write_text("".join(lines))
+    return changed
 
 
 # --- turning mappings into pages to scrape --------------------------------

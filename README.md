@@ -156,9 +156,10 @@ used unless you pass `--legacy-mailbox` (to `scraper.run`, `weekly_combined`,
   and wrapping quotes from the token.
 - **category** on each item is the store's own category path, in the same form
   as the trees sent to `/api/store-categories`. Pak'nSave / New World: the page
-  the item was scraped from (deepest path, then first seen). Woolworths: the
+  the item was scraped from (a real path first, deepest, then first seen). Woolworths: the
   product's own department / aisle / shelf, matched to the cached tree (the
-  deeper of that and the browse path). Blank when unknown, never guessed. It is
+  deeper of that and the browse path). Promotional paths (`featured/`, `christmas/`, `3-for-20`, `fresh-deals`, shelves named
+  for deals / specials / clearance; list in `scraper/store_category.py`) are used only when an item has no other path. Blank when unknown, never guessed. It is
   saved in the snapshots as `store_category`. Older Pak'nSave / New World
   snapshots get it from the page their local label names, when that label names
   exactly one page.
@@ -373,3 +374,11 @@ If a whole page fails to load, that page is skipped and the rest of the run
 continues. If a specific product can't be read at all (e.g. no valid
 price), only that one product is dropped, and the run's summary explains
 why.
+
+## Checking the categories files
+
+`python -m scraper.check_categories` compares every page in `categories.txt`,
+`newworld_categories.txt` and `woolworths_categories.txt` with the cached category
+trees (no network). `--fix` rewrites a Pak'nSave / New World page that is not in the
+tree only when one path with the same parent and nearly the same name is the clear
+match; anything else is listed and left alone.

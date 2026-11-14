@@ -228,3 +228,93 @@ def test_a_category_is_part_of_the_run_id():
     assert make_run_id("newworld", "2026-11-13T08:00:00+13:00", base) != make_run_id(
         "newworld", "2026-11-13T08:00:00+13:00", with_category
     )
+
+
+# --- real paths before promotional ones ----------------------------------------
+
+from scraper.store_category import PROMO_PATTERNS, PROMO_ROOTS, PROMO_SECOND_LEVELS, better_category, is_promotional  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "featured/pams/spices--seasonings", "featured", "christmas/christmas", "christmas",
+        "fish-seafood/3-for-20", "fridge-deli/3-for-12-deli", "fruit-veg/fresh-deals", "fruit-veg/in-season",
+        "meat-poultry/2-for-5", "pantry/weekly-specials", "pantry/clearance", "pantry/baking/deals",
+        "pantry/baking/special-deals-on-flour", "Featured/Pams",
+    ],
+)
+def test_promotional_paths(path):
+    assert is_promotional(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "", "pantry", "pantry/baking/flour", "fruit-veg/fruit", "fridge-deli/deli-meats-seafood",
+        "pantry/spices-seasoning--coatings", "household/ideals", "pantry/for-baking", "pantry/forty-two",
+        "pantry/oil--vinegar/cooking-oil",
+    ],
+)
+def test_real_paths_are_not_promotional(path):
+    assert not is_promotional(path)
+
+
+def test_promo_patterns_live_in_one_place():
+    assert {"featured", "christmas"} <= PROMO_ROOTS
+    assert {"3-for-20", "3-for-12-deli", "fresh-deals", "in-season"} <= PROMO_SECOND_LEVELS
+    assert PROMO_PATTERNS
+
+
+def test_a_real_path_beats_a_deeper_promotional_path():
+    assert better_category("featured/pams/spices--seasonings", "pantry/spices-seasoning--coatings") == "pantry/spices-seasoning--coatings"
+    assert better_category("pantry/spices-seasoning--coatings", "featured/pams/spices--seasonings") == "pantry/spices-seasoning--coatings"
+    assert better_category("fruit-veg/fresh-deals/apples", "fruit-veg") == "fruit-veg"
+
+
+def test_the_deepest_real_path_wins_then_the_first_seen():
+    assert better_category("pantry/baking", "pantry/baking/flour") == "pantry/baking/flour"
+    assert better_category("pantry/baking/flour", "pantry/baking") == "pantry/baking/flour"
+    assert better_category("pantry/baking", "pantry/oil") == "pantry/baking"
+    assert better_category("featured/a", "featured/b/c") == "featured/b/c"  # promotional vs promotional: deepest
+    assert better_category("featured/a", "christmas/b") == "featured/a"
+
+
+def test_a_promotional_path_is_kept_only_when_it_is_alone():
+    assert better_category("", "featured/pams") == "featured/pams"
+    assert better_category("featured/pams", "") == "featured/pams"
+    assert better_category("", "") == ""
+
+
+def test_dedupe_prefers_real_over_promotional_whatever_the_order():
+    def product(path):
+        return {"supermarket": "New World", "product_id": "P1", "store_category": path}
+
+    pages = [product("christmas/christmas"), product("pantry/baking-supplies--sugar"), product("featured/pams/baking")]
+    assert dedupe_products(pages)[0]["store_category"] == "pantry/baking-supplies--sugar"
+    assert dedupe_products(list(reversed(pages)))[0]["store_category"] == "pantry/baking-supplies--sugar"
+    assert dedupe_products([pages[0], pages[2]])[0]["store_category"] == "featured/pams/baking"  # alone: deepest promo
+
+
+def test_woolworths_real_browse_path_beats_a_promotional_own_shelf(tree_dir):
+    tree = [
+        *WOOLWORTHS_TREE,
+        {"path": "fruit-and-veg/fresh-deals", "name": "Fresh Deals", "parent": "fruit-and-veg"},
+    ]
+    (tree_dir / "woolworths.json").write_text(json.dumps({"categories": tree}))
+    store_category.clear_tree_cache()
+    item = api_item(departments=[{"name": "Fruit & Veg"}], aisles=[{"name": "Fresh Deals"}])
+    assert parsed(item)["store_category"] == "fruit-and-veg/fresh-deals"  # the only path there is
+    assert parsed(item, browse_path="fruit-and-veg/fresh-vegetables")["store_category"] == "fruit-and-veg/fresh-vegetables"
+    real = api_item(departments=[{"name": "Pantry"}], aisles=[{"name": "Baking"}])
+    assert parsed(real, browse_path="pantry/3-for-20")["store_category"] == "pantry/baking"
+
+
+def test_a_label_prefers_its_real_page_over_a_promotional_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(category_mapping, "load_mappings", lambda store: {})
+    path = tmp_path / "categories.txt"
+    path.write_text(
+        "https://www.paknsave.co.nz/shop/category/featured/pams/spices--seasonings category=spices\n"
+        "https://www.paknsave.co.nz/shop/category/pantry/spices-seasoning--coatings category=spices\n"
+    )
+    assert label_paths("paknsave", path) == {"spices": "pantry/spices-seasoning--coatings"}

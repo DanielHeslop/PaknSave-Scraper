@@ -7,7 +7,8 @@
     cached tree, or the browse path the product was read from.
 
 Blank means unknown; a path is never guessed. A product seen on several pages keeps
-the deepest path, then the first one seen.
+a real (non-promotional) path first, deepest, then the first one seen; a promotional
+path (see PROMO_*) is kept only when it is the only one.
 """
 
 from __future__ import annotations
@@ -25,6 +26,26 @@ FOODSTUFFS_MARKER = "/shop/category/"
 _tree_cache: dict[tuple[str, str], "Tree"] = {}
 
 
+# --- promotional paths (the one place to extend) -------------------------------
+
+PROMO_ROOTS = {"featured", "christmas"}  # first level: everything below is a promotion
+PROMO_SECOND_LEVELS = {"3-for-20", "3-for-12-deli", "fresh-deals", "in-season"}  # exact names, at any level below the first
+PROMO_PATTERNS = (  # regexes tried on every level below the first, e.g. "2-for-5", "weekly-specials"
+    re.compile(r"(?:^|-)\d+-for-\d+(?:-|$)"),
+    re.compile(r"(?:^|-)(?:deals?|specials?|clearance)(?:-|$)"),
+)
+
+
+def is_promotional(path: str) -> bool:
+    """True for a promotion path (featured/..., christmas/..., 3-for-20, fresh-deals, ...), not a real department."""
+    parts = [p for p in (path or "").lower().strip("/").split("/") if p]
+    if not parts:
+        return False
+    if parts[0] in PROMO_ROOTS:
+        return True
+    return any(part in PROMO_SECOND_LEVELS or any(rx.search(part) for rx in PROMO_PATTERNS) for part in parts[1:])
+
+
 def depth(path: str) -> int:
     return len(path.strip("/").split("/")) if path and path.strip("/") else 0
 
@@ -32,6 +53,20 @@ def depth(path: str) -> int:
 def deeper(current: str, candidate: str) -> str:
     """candidate if it is strictly deeper than current, else current (so the first seen wins a tie)."""
     return candidate if depth(candidate) > depth(current) else current
+
+
+def better_category(current: str, candidate: str) -> str:
+    """The category to keep when a product is seen with another path.
+
+    A real path beats a promotional one; among the same kind the deeper wins, then the first seen.
+    """
+    if not candidate:
+        return current
+    if not current:
+        return candidate
+    if is_promotional(current) != is_promotional(candidate):
+        return candidate if is_promotional(current) else current
+    return deeper(current, candidate)
 
 
 def foodstuffs_path_of(url: str) -> str:
@@ -114,16 +149,16 @@ def woolworths_own_path(item: dict, tree: Tree) -> str:
 
 
 def woolworths_category(item: dict, browse_path: str | None = None, tree: Tree | None = None) -> str:
-    """The deepest of the product's own path and the browse path it was read from ("" if neither is known)."""
+    """The better of the product's own path and the browse path it was read from ("" if neither is known)."""
     own = woolworths_own_path(item, load_tree("woolworths") if tree is None else tree)
-    return deeper(own, (browse_path or "").strip("/"))
+    return better_category(own, (browse_path or "").strip("/"))
 
 
 # --- merging ---------------------------------------------------------------
 
 def merge_category(kept: dict, other: dict) -> dict:
-    """kept, with other's store_category if that is deeper. Copies kept only when it has to change."""
-    better = deeper(kept.get("store_category") or "", other.get("store_category") or "")
+    """kept, with other's store_category if that is better (see better_category). Copies kept only when it has to change."""
+    better = better_category(kept.get("store_category") or "", other.get("store_category") or "")
     if better and better != (kept.get("store_category") or ""):
         return {**kept, "store_category": better}
     return kept
