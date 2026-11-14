@@ -25,6 +25,7 @@ import os
 import urllib.error
 import urllib.request
 
+from scraper.auth import bearer
 from scraper.item_fields import build_item_fields
 
 MAILBOX_URL_ENV = "MAILBOX_URL"
@@ -113,7 +114,7 @@ def _fetch_excluded_keys(mailbox_url: str, mailbox_token: str) -> set[str] | Non
     request = urllib.request.Request(
         url,
         method="GET",
-        headers={"Authorization": f"Bearer {mailbox_token}"},
+        headers={"Authorization": bearer(mailbox_token)},
     )
 
     try:
@@ -167,6 +168,9 @@ def build_payload_item(p: dict) -> dict:
         "supermarket": p.get("supermarket", "Pak'nSave"),
         # Same stable ID already keyed into snapshots/price_history (see storage.py).
         "product_id": p["product_id"],
+        # The store's own category path, same form as the trees posted to /api/store-categories;
+        # blank when unknown (see scraper/store_category.py).
+        "category": p.get("store_category") or "",
     }
     for key, value in fields.items():
         if key not in item:
@@ -275,7 +279,7 @@ def publish_to_mailbox(products: list[dict], dry_run: bool = False) -> int:
         method="POST",
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {mailbox_token}",
+            "Authorization": bearer(mailbox_token),
         },
     )
 

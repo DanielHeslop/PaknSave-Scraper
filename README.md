@@ -147,12 +147,28 @@ used unless you pass `--legacy-mailbox` (to `scraper.run`, `weekly_combined`,
   split, so part boundaries are stable.
 - **Posted one at a time**, in order, never in parallel (the app can't safely
   update its run list from two parts at once). Each part gets 3 tries with a
-  short back-off; only network errors and 408/425/429/5xx are retried.
+  short back-off; only network errors and 408/425/429/5xx are retried. If a
+  503 carries `Retry-After`, that wait is used instead (at most 120 s); the
+  number of tries stays 3. A 401 logs the app's list of received header names
+  (never the token).
+- **Authorization** is `Authorization: Bearer <token>` on every call to the app,
+  built in one place (`scraper/auth.py`), which strips stray whitespace, newlines
+  and wrapping quotes from the token.
+- **category** on each item is the store's own category path, in the same form
+  as the trees sent to `/api/store-categories`. Pak'nSave / New World: the page
+  the item was scraped from (deepest path, then first seen). Woolworths: the
+  product's own department / aisle / shelf, matched to the cached tree (the
+  deeper of that and the browse path). Blank when unknown, never guessed. It is
+  saved in the snapshots as `store_category`. Older Pak'nSave / New World
+  snapshots get it from the page their local label names, when that label names
+  exactly one page.
 - **scrapedAt** is the real scrape time (NZ time with offset), written beside
   each snapshot as `<date>.meta.json`. Snapshots from before that existed use
   the file's modified time.
-- **After the last part**, the run is checked with `GET ?index`. If it isn't
-  listed as complete, `GET ?index&rebuild=1` is called once and checked again.
+- **After the last part**, the run is checked with `GET ?index`
+  (`{runs: [{runId, complete, replacedBy, ...}]}`). If it isn't listed as
+  complete, `GET ?index&rebuild=1` is called once and checked again. A
+  `replacedBy` is shown in the summary.
 - **Missing parts** are saved in `data/pending_runs/` and retried at the start of
   the next run for that store. Or run it by hand:
 

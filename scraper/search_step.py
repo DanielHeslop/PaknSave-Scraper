@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from scraper.app_matcher import AppMatchError, AppMatches, match_terms
 from scraper.ingredients import StoreLists, report_found, report_not_found
 from scraper.matching import _stem, match_products
+from scraper.store_category import merge_category
 
 SEARCH_TIME_BUDGET_SECONDS = 20 * 60
 
@@ -37,14 +38,19 @@ def product_key(product: dict) -> str:
 
 
 def dedupe_products(products: list[dict]) -> list[dict]:
-    """One entry per (supermarket, product_id), first occurrence wins."""
-    seen: set[str] = set()
+    """One entry per (supermarket, product_id), first occurrence wins.
+
+    The kept entry takes the deepest store_category of its duplicates (see scraper/store_category.py).
+    """
+    position: dict[str, int] = {}
     out: list[dict] = []
     for product in products:
         key = product_key(product)
-        if key not in seen:
-            seen.add(key)
+        if key not in position:
+            position[key] = len(out)
             out.append(product)
+        else:
+            out[position[key]] = merge_category(out[position[key]], product)
     return out
 
 

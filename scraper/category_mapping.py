@@ -24,10 +24,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scraper import category_tree
-from scraper.browser import CategoryPage
+from scraper.browser import CategoryPage, parse_categories_file
 from scraper.category_tree import Category, log
 from scraper.ingredients import WatchCategory
 from scraper.matching import _stem
+from scraper.store_category import foodstuffs_path_of  # noqa: F401 (re-exported)
 
 # Page limit for a mapped watch category at Pak'nSave / New World: the same limit
 # Woolworths uses for its main lists (DEFAULT_BROWSE_MAX_PAGES), above the 3 pages
@@ -247,13 +248,43 @@ def log_mapping(result: MappingResult) -> None:
         log(f"  '{m.name}' -> {m.path} [{m.how}]{tag}")
 
 
+# --- categories of an older snapshot -------------------------------------------
+
+def label_paths(store: str, categories_file: str | Path | None = None) -> dict[str, str]:
+    """Label (a snapshot's "category") -> the one category page path it came from. Ambiguous labels are left out."""
+    from scraper.browser import SITES
+
+    if categories_file is None:
+        if store not in SITES:
+            return {}
+        categories_file = Path(category_tree.REPO_ROOT) / SITES[store].default_categories_file
+    found: dict[str, set[str]] = {}
+    for page in parse_categories_file(categories_file):
+        found.setdefault(page.category, set()).add(foodstuffs_path_of(page.url))
+    for record in load_mappings(store).values():
+        label = re.sub(r"[^a-z0-9]+", "-", record["name"].lower()).strip("-") or record["path"].rsplit("/", 1)[-1]
+        found.setdefault(label, set()).add(record["path"])
+    return {label: next(iter(paths)) for label, paths in found.items() if len(paths) == 1}
+
+
+def add_categories_from_labels(products: list[dict], store: str, categories_file: str | Path | None = None) -> tuple[list[dict], int]:
+    """Products from a snapshot written before store_category existed, with it filled in where the label names one page.
+
+    A snapshot keeps the first page a product was seen on, so this can be shallower than the
+    deepest page it was on. Products already carrying a store_category are left alone.
+    Returns (products, how many were filled in).
+    """
+    paths = label_paths(store, categories_file)
+    out, filled = [], 0
+    for product in products:
+        if not product.get("store_category") and paths.get(product.get("category", "")):
+            product = {**product, "store_category": paths[product["category"]]}
+            filled += 1
+        out.append(product)
+    return out, filled
+
+
 # --- turning mappings into pages to scrape --------------------------------
-
-def foodstuffs_path_of(url: str) -> str:
-    path = urllib.parse.unquote(urllib.parse.urlsplit(url).path)
-    marker = "/shop/category/"
-    return path.split(marker, 1)[1].strip("/") if marker in path else path.strip("/")
-
 
 def label_for(m: Mapping) -> str:
     return re.sub(r"[^a-z0-9]+", "-", m.name.lower()).strip("-") or m.path.rsplit("/", 1)[-1]

@@ -16,6 +16,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from scraper.auth import bearer
+
 DEFAULT_INGREDIENT_LIST_URL = "https://my-recipe-manager.netlify.app/api/ingredient-list"
 TIMEOUT_SECONDS = 15
 
@@ -51,7 +53,7 @@ def fetch_ingredient_list(url: str = DEFAULT_INGREDIENT_LIST_URL) -> list[str]:
     headers = {"Accept": "application/json"}
     mailbox_token = os.environ.get(MAILBOX_TOKEN_ENV)
     if mailbox_token:
-        headers["Authorization"] = f"Bearer {mailbox_token}"
+        headers["Authorization"] = bearer(mailbox_token)
     request = urllib.request.Request(url, headers=headers)
 
     try:
@@ -147,7 +149,7 @@ def _auth_headers(extra: dict | None = None) -> dict:
         headers.update(extra)
     token = os.environ.get(MAILBOX_TOKEN_ENV)
     if token:
-        headers["Authorization"] = f"Bearer {token}"
+        headers["Authorization"] = bearer(token)
     return headers
 
 

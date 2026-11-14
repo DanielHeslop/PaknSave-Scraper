@@ -39,6 +39,7 @@ from scraper.overrides import get_override, load_overrides
 from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
 from scraper.robots import RobotsGuard
 from scraper.storage import update_price_history, write_snapshot
+from scraper.store_category import foodstuffs_path_of
 from scraper.unit_price import derive_from_size_and_price
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -223,6 +224,7 @@ async def scrape_all(
                     dropped_reasons.append(f"{product['product_id']} {product['name']} - {reason}")
                     continue
 
+                product["store_category"] = foodstuffs_path_of(category_page.url)
                 products.append(product)
                 page_ids.add(product["product_id"])
 

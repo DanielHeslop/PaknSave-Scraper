@@ -47,6 +47,7 @@ from datetime import date
 import requests
 
 from scraper.robots import RobotsDisallowed, RobotsGuard
+from scraper.store_category import woolworths_category
 
 BASE_URL = "https://www.woolworths.co.nz/api/v1/products"
 SITE_ROOT = "https://www.woolworths.co.nz"
@@ -223,7 +224,7 @@ def _read_promo(item: dict, price: float) -> dict:
     return promo
 
 
-def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | None]:
+def _parse_item(item: dict, fallback_category: str, browse_path: str | None = None) -> tuple[dict | None, str | None]:
     """Parse one raw search-result/product-lookup item into this repo's
     product dict shape, or return (None, reason) if it can't be read at all.
 
@@ -283,6 +284,7 @@ def _parse_item(item: dict, fallback_category: str) -> tuple[dict | None, str | 
         "product_id": str(sku),
         "name": name,
         "category": category,
+        "store_category": woolworths_category(item, browse_path),
         "size": size,
         "price": price,
         "unit_price": unit_price,
@@ -365,7 +367,7 @@ def browse_products(path: str, max_pages: int = 5, label: str | None = None) -> 
         items = block.get("items") or []
         total = block.get("totalItems") or total
         for item in items:
-            product, reason = _parse_item(item, fallback_category=fallback)
+            product, reason = _parse_item(item, fallback_category=fallback, browse_path=path)
             if reason is not None:
                 skip_reasons.append(reason)
             else:

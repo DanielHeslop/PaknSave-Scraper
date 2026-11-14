@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 
+import scraper.category_mapping as category_mapping
 import scraper.price_runs as price_runs
 import scraper.weekly_combined as weekly_combined
 from scraper.ingredients import StoreLists
@@ -157,6 +158,8 @@ def test_publish_snapshot_file_dry_run_reports_counts_without_posting(monkeypatc
         lambda products, store, scraped_at, dry_run=False, **kw: posted.append((products, dry_run)) or RunResult(),
     )
 
+    monkeypatch.setattr(category_mapping, "label_paths", lambda store, categories_file=None: {})
+
     exit_code = publish_snapshot_file(str(snapshot_path), save=False)
 
     assert exit_code == 0
@@ -174,10 +177,31 @@ def test_publish_snapshot_file_save_actually_publishes(monkeypatch, tmp_path):
         lambda products, store, scraped_at, dry_run=False, **kw: posted.append((products, dry_run)) or RunResult(),
     )
 
+    monkeypatch.setattr(category_mapping, "label_paths", lambda store, categories_file=None: {})
+
     exit_code = publish_snapshot_file(str(snapshot_path), save=True)
 
     assert exit_code == 0
     assert posted == [(_CATEGORY_PRODUCTS, False)]
+
+
+def test_publish_snapshot_file_fills_store_category_from_the_label(monkeypatch, tmp_path):
+    snapshot_path = tmp_path / "2026-10-03.json"
+    snapshot_path.write_text(json.dumps(_CATEGORY_PRODUCTS))
+    posted = []
+    monkeypatch.setattr(
+        price_runs,
+        "publish_run",
+        lambda products, store, scraped_at, dry_run=False, **kw: posted.append(products) or RunResult(),
+    )
+    monkeypatch.setattr(
+        category_mapping, "label_paths", lambda store, categories_file=None: {"vegetables": "fruit-and-vegetables/vegetables"}
+    )
+
+    publish_snapshot_file(str(snapshot_path), save=False)
+
+    assert posted[0][0]["store_category"] == "fruit-and-vegetables/vegetables"
+    assert "store_category" not in _CATEGORY_PRODUCTS[0]
 
 
 def test_publish_snapshot_file_missing_file_returns_error(tmp_path):

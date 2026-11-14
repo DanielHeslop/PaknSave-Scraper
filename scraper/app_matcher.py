@@ -18,6 +18,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+from scraper.auth import bearer
+
 MAILBOX_URL_ENV = "MAILBOX_URL"
 MAILBOX_TOKEN_ENV = "MAILBOX_TOKEN"
 MATCH_PATH = "/api/match-terms"
@@ -59,7 +61,7 @@ def _post(url: str, token: str, body: dict, timeout: float) -> dict:
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": f"Bearer {token}",
+            "Authorization": bearer(token),
         },
     )
     deadline = time.monotonic() + timeout

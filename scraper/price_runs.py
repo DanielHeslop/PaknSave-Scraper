@@ -32,10 +32,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from scraper.auth import bearer, clean_token
 from scraper.publish import (
     MAILBOX_TOKEN_ENV,
     MAILBOX_URL_ENV,
@@ -54,6 +56,8 @@ INDEX_TIMEOUT_SECONDS = 30
 ATTEMPTS = 3
 RETRY_DELAYS_SECONDS = (2, 6)
 _ENVELOPE_MARGIN_BYTES = 64
+MAX_RETRY_AFTER_SECONDS = 120
+MAX_ERROR_BODY_BYTES = 2000
 
 NZ_TZ = ZoneInfo("Pacific/Auckland")
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -189,13 +193,46 @@ def price_runs_url(mailbox_url: str) -> str:
 
 
 class _RequestFailed(Exception):
-    def __init__(self, message: str, retryable: bool):
+    def __init__(self, message: str, retryable: bool, retry_after: float | None = None):
         super().__init__(message)
         self.retryable = retryable
+        self.retry_after = retry_after
+
+
+def parse_retry_after(value) -> float | None:
+    """Seconds from a Retry-After header (a number of seconds or an HTTP date); None if absent or unreadable."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:
+            when = parsedate_to_datetime(text)
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            seconds = (when - datetime.now(timezone.utc)).total_seconds()
+        except (TypeError, ValueError):
+            return None
+    return max(0.0, seconds)
+
+
+def _received_headers_note(error: urllib.error.HTTPError, token: str) -> str:
+    """What the app's 401 says it received (header names only, it never sends values), with the token removed."""
+    try:
+        raw = error.read(MAX_ERROR_BODY_BYTES)
+    except Exception:
+        return ""
+    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    for secret in {token, clean_token(token)}:
+        if secret:
+            text = text.replace(secret, "[token]")
+    text = " ".join(text.split())
+    return f"; the app's reply: {text[:400]}" if text else ""
 
 
 def _request(url: str, token: str, method: str, body: bytes | None, timeout: float) -> bytes:
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    headers = {"Authorization": bearer(token), "Accept": "application/json"}
     if body is not None:
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=body, method=method, headers=headers)
@@ -205,7 +242,9 @@ def _request(url: str, token: str, method: str, body: bytes | None, timeout: flo
             data = response.read()
     except urllib.error.HTTPError as e:
         retryable = e.code in (408, 425, 429) or e.code >= 500
-        raise _RequestFailed(f"status {e.code} ({e.reason})", retryable) from None
+        retry_after = parse_retry_after(e.headers.get("Retry-After")) if retryable and e.headers else None
+        note = _received_headers_note(e, token) if e.code == 401 else ""
+        raise _RequestFailed(f"status {e.code} ({e.reason}){note}", retryable, retry_after) from None
     except TimeoutError:
         raise _RequestFailed(f"timed out after {timeout:g}s", True) from None
     except urllib.error.URLError as e:
@@ -218,7 +257,11 @@ def _request(url: str, token: str, method: str, body: bytes | None, timeout: flo
 
 
 def _with_retries(label: str, send) -> bytes | None:
-    """Run send() up to ATTEMPTS times; None if every attempt failed (the reason is logged)."""
+    """Run send() up to ATTEMPTS times; None if every attempt failed (the reason is logged).
+
+    A Retry-After from the app (503 / 429) sets the wait before the next attempt (at most
+    MAX_RETRY_AFTER_SECONDS); the number of attempts stays ATTEMPTS.
+    """
     for attempt in range(1, ATTEMPTS + 1):
         try:
             return send()
@@ -227,7 +270,11 @@ def _with_retries(label: str, send) -> bytes | None:
             log(f"  {label}: attempt {attempt}/{ATTEMPTS} failed - {e}{'' if not final else ' - giving up'}.")
             if final:
                 return None
-            _sleep(RETRY_DELAYS_SECONDS[min(attempt - 1, len(RETRY_DELAYS_SECONDS) - 1)])
+            delay = RETRY_DELAYS_SECONDS[min(attempt - 1, len(RETRY_DELAYS_SECONDS) - 1)]
+            if e.retry_after is not None:
+                delay = min(e.retry_after, MAX_RETRY_AFTER_SECONDS)
+                log(f"  {label}: the app asked for a wait of {e.retry_after:g}s - waiting {delay:g}s.")
+            _sleep(delay)
     return None
 
 
@@ -237,55 +284,86 @@ def post_part(url: str, token: str, body: bytes, label: str) -> bool:
 
 # --- the app's run list --------------------------------------------------
 
-def _find_run(data, run_id: str):
-    if isinstance(data, dict):
-        if data.get("runId") == run_id or data.get("id") == run_id:
-            return data
-        if isinstance(data.get(run_id), dict):
-            return data[run_id]
-        children = data.values()
-    elif isinstance(data, list):
-        children = data
-    else:
-        return None
-    for child in children:
-        found = _find_run(child, run_id)
-        if found is not None:
-            return found
-    return None
+@dataclass
+class IndexRun:
+    """One entry of GET ?index -> {"runs": [...], "migrated": ..., "now": ...}."""
+
+    run_id: str
+    store: str = ""
+    complete: bool = False
+    parts: int | None = None
+    got: list[int] = field(default_factory=list)
+    count: int | None = None
+    source: str = ""
+    replaced_by: str | None = None
+    received_at: str = ""
 
 
-def _is_complete(run: dict) -> bool:
-    if run.get("complete") is True:
-        return True
-    return str(run.get("status", "")).lower() == "complete"
+@dataclass
+class IndexCheck:
+    state: str  # "complete", "incomplete" (listed but not complete, or not listed) or "unknown" (could not be read)
+    run: IndexRun | None = None  # the run's entry, None if it is not listed
+
+    @property
+    def replaced_by(self) -> str | None:
+        return self.run.replaced_by if self.run else None
 
 
-def check_index(url: str, token: str, run_id: str, rebuild: bool = False) -> str:
-    """"complete", "incomplete" (listed but not complete, or not listed) or "unknown" (could not be read)."""
+def parse_index(data) -> dict[str, IndexRun]:
+    """The runs of an index reply by runId. Raises ValueError if there is no "runs" list."""
+    if not isinstance(data, dict) or not isinstance(data.get("runs"), list):
+        raise ValueError('the run list has no "runs" list')
+    runs: dict[str, IndexRun] = {}
+    for entry in data["runs"]:
+        if not isinstance(entry, dict) or not entry.get("runId"):
+            continue
+        got = entry.get("got")
+        replaced_by = entry.get("replacedBy")
+        runs[str(entry["runId"])] = IndexRun(
+            run_id=str(entry["runId"]),
+            store=str(entry.get("store") or ""),
+            complete=entry.get("complete") is True,
+            parts=entry.get("parts") if isinstance(entry.get("parts"), int) else None,
+            got=[n for n in got if isinstance(n, int)] if isinstance(got, list) else [],
+            count=entry.get("count") if isinstance(entry.get("count"), int) else None,
+            source=str(entry.get("source") or ""),
+            replaced_by=str(replaced_by) if replaced_by else None,
+            received_at=str(entry.get("receivedAt") or ""),
+        )
+    return runs
+
+
+def fetch_index(url: str, token: str, rebuild: bool = False) -> dict[str, IndexRun] | None:
+    """GET ?index (or ?index&rebuild=1) and parse it; None if it could not be read (the reason is logged)."""
     suffix = "?index&rebuild=1" if rebuild else "?index"
     raw = _with_retries(
         "run list" + (" (rebuild)" if rebuild else ""),
         lambda: _request(url + suffix, token, "GET", None, INDEX_TIMEOUT_SECONDS),
     )
     if raw is None:
-        return "unknown"
+        return None
     try:
-        data = json.loads(raw)
-    except ValueError:
-        log("  run list: the reply was not valid JSON.")
-        return "unknown"
-    run = _find_run(data, run_id)
+        return parse_index(json.loads(raw))
+    except ValueError as e:
+        log(f"  run list: the reply could not be read ({e}).")
+        return None
+
+
+def check_index(url: str, token: str, run_id: str, rebuild: bool = False) -> IndexCheck:
+    runs = fetch_index(url, token, rebuild)
+    if runs is None:
+        return IndexCheck("unknown")
+    run = runs.get(run_id)
     if run is None:
-        return "incomplete"
-    return "complete" if _is_complete(run) else "incomplete"
+        return IndexCheck("incomplete")
+    return IndexCheck("complete" if run.complete else "incomplete", run)
 
 
-def verify_in_index(url: str, token: str, run_id: str) -> tuple[str, bool]:
-    """Check the run is complete; if not, rebuild the list once and check again. Returns (state, rebuilt)."""
-    state = check_index(url, token, run_id)
-    if state == "complete":
-        return state, False
+def verify_in_index(url: str, token: str, run_id: str) -> tuple[IndexCheck, bool]:
+    """Check the run is complete; if not, rebuild the list once and check again. Returns (check, rebuilt)."""
+    check = check_index(url, token, run_id)
+    if check.state == "complete":
+        return check, False
     log("  The run list does not show the run as complete - asking the app to rebuild it once.")
     check_index(url, token, run_id, rebuild=True)
     return check_index(url, token, run_id), True
@@ -341,6 +419,7 @@ class RunResult:
     parts: int = 0
     missing: list[int] = field(default_factory=list)
     index: str | None = None  # "complete", "incomplete", "unknown" or None (not checked)
+    replaced_by: str | None = None  # the run the app says replaced this one, if any
     rebuilt: bool = False
     note: str | None = None  # why nothing was posted
 
@@ -357,7 +436,8 @@ class RunResult:
         if self.missing:
             return f"run failed (missing parts {', '.join(str(p) for p in self.missing)})"
         index = {"complete": "index complete", "incomplete": "index NOT complete", "unknown": "index could not be checked"}
-        return f"run posted (parts {self.parts}/{self.parts}, {index.get(self.index or '', 'index not checked')})"
+        replaced = f", replaced by {self.replaced_by}" if self.replaced_by else ""
+        return f"run posted (parts {self.parts}/{self.parts}, {index.get(self.index or '', 'index not checked')}{replaced})"
 
 
 # --- posting ---------------------------------------------------------------
@@ -456,7 +536,8 @@ def _publish_run(products, store, scraped_at, dry_run, legacy, snapshot_path, on
         log(f"Run {plan.run_id}: parts {missing} did not go through - they will be retried next run or by post_run.")
         return result
 
-    result.index, result.rebuilt = verify_in_index(url, token, plan.run_id)
+    check, result.rebuilt = verify_in_index(url, token, plan.run_id)
+    result.index, result.replaced_by = check.state, check.replaced_by
     log(f"Run {plan.run_id}: {result.summary()}" + (" (after a rebuild)" if result.rebuilt else ""))
     return result
 
@@ -473,6 +554,7 @@ def retry_pending(store: str) -> None:
                 log(f"Earlier run {run_id} has missing parts but its snapshot can't be read - dropped.")
                 _record_pending(store, run_id, "", 0, [], None)
                 continue
+            products = with_snapshot_categories(products, store) if isinstance(products, list) else products
             log(f"Retrying missing parts {record.get('missing')} of the earlier run {run_id}.")
             publish_run(
                 products,
@@ -497,6 +579,22 @@ def latest_snapshot(store: str, snapshots_dir: str | Path | None = None) -> Path
     return names[-1] if names else None
 
 
+def with_snapshot_categories(products: list[dict], store: str) -> list[dict]:
+    """Fill in store_category for a snapshot that predates it, from the page each product's label names (Foodstuffs)."""
+    if store not in ("paknsave", "newworld") or all(p.get("store_category") for p in products):
+        return products
+    from scraper.category_mapping import add_categories_from_labels
+
+    try:
+        filled, count = add_categories_from_labels(products, store)
+    except Exception as e:
+        log(f"Could not work out categories from the snapshot ({type(e).__name__}).")
+        return products
+    if count:
+        log(f"Filled in the store category of {count} of {len(products)} product(s) from the pages their labels name.")
+    return filled
+
+
 def post_snapshot_file(path: str | Path, store: str, *, dry_run: bool, legacy: bool = False) -> RunResult | None:
     """Post a saved snapshot as a run. None if the file can't be read."""
     path = Path(path)
@@ -511,6 +609,7 @@ def post_snapshot_file(path: str | Path, store: str, *, dry_run: bool, legacy: b
     if not isinstance(products, list):
         log(f"Snapshot at {path} is not a JSON array of products.")
         return None
+    products = with_snapshot_categories(products, store)
     scraped_at = scraped_at_for_snapshot(path)
     log(f"Loaded {len(products)} product(s) from {path} (scraped {scraped_at}).")
     return publish_run(products, store, scraped_at, dry_run=dry_run, legacy=legacy, snapshot_path=path.resolve())

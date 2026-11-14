@@ -37,6 +37,7 @@ from pathlib import Path
 
 import requests
 
+from scraper.auth import bearer
 from scraper.browser import PAGE_DELAY_JITTER_SECONDS, PAGE_DELAY_SECONDS, SITES
 from scraper.robots import USER_AGENT, RobotsGuard, RobotsRules
 
@@ -322,7 +323,7 @@ def post_tree(store: str, categories: list[Category], updated_at: str) -> tuple[
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": f"Bearer {token}",
+            "Authorization": bearer(token),
         },
     )
     try:
