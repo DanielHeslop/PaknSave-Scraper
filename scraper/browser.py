@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -92,6 +92,15 @@ NEWWORLD_STORE_ID = "d4408e0f-5268-42c2-ba76-2bc9732d4316"
 NEWWORLD_STORE_COOKIE_DOMAIN = "www.newworld.co.nz"
 
 
+# Pak'nSave pages hold exactly 50 products. New World pages are noisier: tiles repeat
+# products from the page before, so a page shows 46-70 tiles (live spices read: 65, 70,
+# 68, 68, then a last page of 38 and a sixth page of 16 repeats). A New World page of
+# 40 or more tiles may be followed by another; a wrong guess costs one extra page,
+# while a threshold set too high would drop the last pages of a category.
+PAKNSAVE_FULL_PAGE_TILES = 50
+NEWWORLD_FULL_PAGE_TILES = 40
+
+
 @dataclass(frozen=True)
 class Site:
     """One supermarket chain's site config: which domain to pin a store on,
@@ -104,6 +113,9 @@ class Site:
     store_id: str
     default_categories_file: str
     default_snapshots_subdir: str
+    # Product tiles on a full listing page. A page with at least this many tiles
+    # may be followed by another; a shorter one is the category's last page.
+    full_page_tiles: int
 
 
 SITES: dict[str, Site] = {
@@ -113,6 +125,7 @@ SITES: dict[str, Site] = {
         store_id=PETONE_STORE_ID,
         default_categories_file="categories.txt",
         default_snapshots_subdir="snapshots",
+        full_page_tiles=PAKNSAVE_FULL_PAGE_TILES,
     ),
     "newworld": Site(
         supermarket="New World",
@@ -120,6 +133,7 @@ SITES: dict[str, Site] = {
         store_id=NEWWORLD_STORE_ID,
         default_categories_file="newworld_categories.txt",
         default_snapshots_subdir="newworld_snapshots",
+        full_page_tiles=NEWWORLD_FULL_PAGE_TILES,
     ),
 }
 
@@ -132,13 +146,12 @@ class CategoryPage:
     # optional covers= setting); used to decide which search terms a
     # category could answer for - see scraper/search_step.py.
     covers: tuple[str, ...] = ()
-    # Mapped watch categories are followed page by page (?pg=2, 3, ...) up to
-    # max_pages, stopping at the first short or repeated page. Pages listed in
-    # the categories file are already expanded by pages=N and keep max_pages 1.
+    # `page` is this page's number within its category and `max_pages` the page limit
+    # of the category (pages=N in the categories file, or the default for a mapped watch
+    # category). scrape_all reads each category page by page from its page 1, so the
+    # pages after the first are only listed here for callers that count them.
     page: int = 1
     max_pages: int = 1
-    first_page_tiles: int = 0
-    seen_ids: set = field(default_factory=set, repr=False, compare=False)
 
 
 def parse_categories_file(path: str | Path) -> list[CategoryPage]:
@@ -181,10 +194,16 @@ def parse_categories_file(path: str | Path) -> list[CategoryPage]:
         base_url = url.split("?")[0]
         for page_num in range(1, num_pages + 1):
             if page_num == 1:
-                pages.append(CategoryPage(url=url, category=category, covers=covers))
+                pages.append(CategoryPage(url=url, category=category, covers=covers, max_pages=num_pages))
             else:
                 pages.append(
-                    CategoryPage(url=f"{base_url}?pg={page_num}", category=category, covers=covers)
+                    CategoryPage(
+                        url=f"{base_url}?pg={page_num}",
+                        category=category,
+                        covers=covers,
+                        page=page_num,
+                        max_pages=num_pages,
+                    )
                 )
 
     return pages

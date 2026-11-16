@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from scraper import page_limits
 from scraper.category_mapping import Mapping, MappingResult, covers_for, label_for, sync_and_map
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
@@ -187,10 +188,14 @@ def browse_all(pages: list[BrowsePage]) -> dict:
     scraped: dict[str, tuple[str, ...]] = {}
     blocked: list[str] = []
     failed = 0
+    page_stats: list[page_limits.PageStat] = []
+    remembered = page_limits.load_page_counts(STORE)
     for i, page in enumerate(pages, start=1):
         log(f"\n[{i}/{len(pages)}] browsing: {page.path}")
+        limit = max(page.max_pages, remembered.get(page.path, 0))
+        stat = page_limits.PageStat(label=page.label, path=page.path, configured=page.max_pages, limit=limit)
         try:
-            found, skip_reasons, total = browse_products(page.path, page.max_pages, page.label)
+            found, skip_reasons, total = browse_products(page.path, limit, page.label, stat=stat)
         except RobotsDisallowed as e:
             log(f"  SKIPPED: robots.txt disallows {e}")
             failed += 1
@@ -204,18 +209,23 @@ def browse_all(pages: list[BrowsePage]) -> dict:
             log(f"  FAILED: {type(e).__name__}: {e}")
             failed += 1
             continue
+        page_stats.append(stat)
+        page_limits.log_cut_short([stat], log)
         log(f"  {len(found)} of {total} product(s) read, {len(skip_reasons)} skipped")
         dropped.extend(f"[{page.path}] {r}" for r in skip_reasons)
         products.extend(_keep_valid(found, dropped))
         scraped.setdefault(page.label, page.covers)
     products = dedupe_products(products)
+    counts = page_limits.cut_short_counts(page_stats)
     stats = {
+        "categories_cut_short": counts["cut_short"],
+        "extra_pages_read": counts["extra_pages"],
         "categories_scraped": len(scraped),
         "categories_failed": failed,
         "terms_blocked": blocked,
         "products_dropped": dropped,
     }
-    return {"products": products, "scraped_categories": scraped, "stats": stats}
+    return {"products": products, "scraped_categories": scraped, "stats": stats, "page_stats": page_stats}
 
 
 def search_all(
@@ -347,6 +357,8 @@ def print_summary(stats: dict) -> None:
     print("=" * 60)
     print(f"Browse paths read           : {stats['categories_scraped']}")
     print(f"Browse paths failed         : {stats['categories_failed']}")
+    print(f"Categories cut short        : {stats.get('categories_cut_short', 0)}")
+    print(f"Extra pages read            : {stats.get('extra_pages_read', 0)}")
     print(f"Requests blocked (403/429)  : {len(stats['terms_blocked'])}")
     for reason in stats["terms_blocked"]:
         print(f"  - {reason}")
@@ -413,6 +425,7 @@ def main() -> int:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(browse_products_list, args.snapshots_dir, today)
         write_scrape_meta(snapshot_path, scraped_at)
+        page_limits.save_page_stats(STORE, browse.get("page_stats", []), log)
         _, new_entries = update_price_history(browse_products_list, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
@@ -470,6 +483,7 @@ def main() -> int:
             time.monotonic() - started,
             mapping.counts() if mapping else None,
             run_status,
+            {"cut_short": stats.get("categories_cut_short", 0), "extra_pages": stats.get("extra_pages_read", 0)},
         )
     )
     return 0

@@ -1,8 +1,9 @@
 """Mapped watch categories are read page by page, like the main lists.
 
 Pak'nSave / New World: scraper.run.scrape_all follows a mapped category's ?pg=
-pages (limit MAPPED_FOODSTUFFS_MAX_PAGES) until the last page. Woolworths: the
-mapped browse pages get the same page limit as the main list's default.
+pages until the last page (a full page at the limit is read past it, see
+test_page_limits.py). Woolworths: the mapped browse pages get the same page limit
+as the main list's default. A full Pak'nSave page holds 50 products.
 """
 
 from __future__ import annotations
@@ -13,11 +14,12 @@ from contextlib import asynccontextmanager
 import scraper.run as run
 import scraper.woolworths as woolworths
 from scraper import woolworths_transport as transport
-from scraper.browser import CategoryPage, PageLoadTimeout
+from scraper.browser import SITES, CategoryPage, PageLoadTimeout
 from scraper.category_mapping import MAPPED_FOODSTUFFS_MAX_PAGES, Mapping, extra_foodstuffs_pages
 from scraper.extract import ExtractResult
 
 BASE = "https://www.paknsave.co.nz/shop/category/"
+FULL = SITES["paknsave"].full_page_tiles
 
 
 class FakeSite:
@@ -101,83 +103,70 @@ def _mapped(path: str = "pantry/bulk-foods") -> CategoryPage:
 
 def test_a_mapped_category_is_read_until_its_last_short_page(monkeypatch, tmp_path):
     url = BASE + "pantry/bulk-foods"
-    site = FakeSite({url: _ids("a", 20), url + "?pg=2": _ids("b", 20), url + "?pg=3": _ids("c", 7)})
+    site = FakeSite({url: _ids("a", FULL), url + "?pg=2": _ids("b", FULL), url + "?pg=3": _ids("c", 7)})
     result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped()])
     assert site.loaded == [url, url + "?pg=2", url + "?pg=3"]
-    assert len(result["products"]) == 47
+    assert len(result["products"]) == 2 * FULL + 7
     assert site.pauses == 2  # the same pause before every page after the first
     assert result["stats"]["pages_scraped"] == 3
 
 
-def test_paging_stops_at_the_page_limit(monkeypatch, tmp_path):
-    url = BASE + "pantry/bulk-foods"
-    pages = {url: _ids("p1-", 20)}
-    for n in range(2, 9):
-        pages[f"{url}?pg={n}"] = _ids(f"p{n}-", 20)
-    site = FakeSite(pages)
-    result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped()])
-    assert len(site.loaded) == MAPPED_FOODSTUFFS_MAX_PAGES == 5
-    assert len(result["products"]) == 100
-
-
 def test_paging_stops_on_an_empty_page(monkeypatch, tmp_path):
     url = BASE + "pantry/bulk-foods"
-    site = FakeSite({url: _ids("a", 20), url + "?pg=2": _ids("b", 20)})
+    site = FakeSite({url: _ids("a", FULL), url + "?pg=2": _ids("b", FULL)})
     _scrape(monkeypatch, tmp_path, site, extra=[_mapped()])
     assert site.loaded == [url, url + "?pg=2", url + "?pg=3"]
 
 
 def test_paging_stops_when_a_page_repeats_the_one_before(monkeypatch, tmp_path):
     url = BASE + "pantry/bulk-foods"
-    same = _ids("a", 20)
+    same = _ids("a", FULL)
     site = FakeSite({url: same, url + "?pg=2": same, url + "?pg=3": same})
     result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped()])
     assert site.loaded == [url, url + "?pg=2"]
-    assert len(result["products"]) == 40  # the repeat is de-duplicated later, as for every list
+    assert len(result["products"]) == 2 * FULL  # the repeat is de-duplicated later, as for every list
 
 
-def test_a_short_first_page_costs_one_empty_check_of_page_two(monkeypatch, tmp_path):
-    # Page one sets the page size, so a short page one can't be known as the last
-    # until page two comes back empty. That is the only extra request.
+def test_a_short_first_page_is_the_only_page(monkeypatch, tmp_path):
     url = BASE + "pantry/bulk-foods"
     site = FakeSite({url: _ids("a", 9)})
     result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped()])
-    assert site.loaded == [url, url + "?pg=2"]
+    assert site.loaded == [url]
     assert len(result["products"]) == 9
 
 
 def test_products_the_main_lists_already_scraped_do_not_stop_the_paging(monkeypatch, tmp_path):
     main = BASE + "pantry/spices--seasonings"
     mapped = BASE + "pantry/bulk-foods"
-    site = FakeSite({main: _ids("a", 20), mapped: _ids("a", 20), mapped + "?pg=2": _ids("b", 20), mapped + "?pg=3": _ids("c", 3)})
+    site = FakeSite({main: _ids("a", 20), mapped: _ids("a", FULL), mapped + "?pg=2": _ids("b", FULL), mapped + "?pg=3": _ids("c", 3)})
     result = _scrape(monkeypatch, tmp_path, site, categories=f"{main}\n", extra=[_mapped()])
     assert site.loaded == [main, mapped, mapped + "?pg=2", mapped + "?pg=3"]
-    assert len(result["products"]) == 63
+    assert len(result["products"]) == 20 + 2 * FULL + 3
 
 
-def test_main_list_pages_are_not_followed_beyond_pages_equals_n(monkeypatch, tmp_path):
+def test_main_list_pages_equals_n_is_the_limit_when_the_last_page_is_short(monkeypatch, tmp_path):
     main = BASE + "pantry/spices--seasonings"
-    site = FakeSite({main: _ids("a", 20), main + "?pg=2": _ids("b", 20), main + "?pg=3": _ids("c", 20)})
-    _scrape(monkeypatch, tmp_path, site, categories=f"{main} pages=2\n")
+    site = FakeSite({main: _ids("a", FULL), main + "?pg=2": _ids("b", 12), main + "?pg=3": _ids("c", FULL)})
+    _scrape(monkeypatch, tmp_path, site, categories=f"{main} pages=3\n")
     assert site.loaded == [main, main + "?pg=2"]
 
 
 def test_a_failed_page_load_ends_that_categorys_paging_but_not_the_run(monkeypatch, tmp_path):
     first = BASE + "pantry/bulk-foods"
     second = BASE + "pantry/stock"
-    site = FakeSite({first: _ids("a", 20), first + "?pg=2": _ids("b", 20), second: _ids("s", 4)})
+    site = FakeSite({first: _ids("a", FULL), first + "?pg=2": _ids("b", FULL), second: _ids("s", 4)})
     site.broken.add(first + "?pg=2")
     result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped(), _mapped("pantry/stock")])
-    assert site.loaded == [first, second, second + "?pg=2"]
+    assert site.loaded == [first, second]
     assert result["stats"]["pages_skipped"] == [first + "?pg=2"]
-    assert len(result["products"]) == 24
+    assert len(result["products"]) == FULL + 4
 
 
 def test_robots_txt_is_checked_for_every_page(monkeypatch, tmp_path):
     from scraper.robots import RobotsGuard
 
     url = BASE + "pantry/bulk-foods"
-    site = FakeSite({url: _ids("a", 20), url + "?pg=2": _ids("b", 20), url + "?pg=3": _ids("c", 20)})
+    site = FakeSite({url: _ids("a", FULL), url + "?pg=2": _ids("b", FULL), url + "?pg=3": _ids("c", FULL)})
     guard = RobotsGuard()
     monkeypatch.setattr(guard, "allows", lambda u: "pg=2" not in u)
     result = _scrape(monkeypatch, tmp_path, site, extra=[_mapped()], guard=guard)
@@ -231,13 +220,14 @@ def test_woolworths_mapped_category_is_read_page_by_page_to_the_end(monkeypatch)
     assert len(result["products"]) == 300
 
 
-def test_woolworths_mapped_category_stops_at_the_page_limit(monkeypatch):
+def test_woolworths_mapped_category_is_read_past_the_page_limit_while_pages_are_full(monkeypatch):
     calls: list[int] = []
-    _woolworths_reply(monkeypatch, 2000, calls)
+    _woolworths_reply(monkeypatch, 2000, calls)  # 16 full pages + 80
     page = woolworths.extra_browse_pages([Mapping("oils", "pantry/oils", "exact")], [])[0]
     result = woolworths.browse_all([page])
-    assert calls == [1, 2, 3, 4, 5]
-    assert len(result["products"]) == 600
+    assert calls == list(range(1, 18))
+    assert len(result["products"]) == 2000
+    assert result["stats"]["categories_cut_short"] == 1 and result["stats"]["extra_pages_read"] == 12
 
 
 def test_woolworths_mapped_products_are_deduplicated_with_the_main_lists(monkeypatch):

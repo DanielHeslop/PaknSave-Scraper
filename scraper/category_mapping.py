@@ -371,8 +371,12 @@ def apply_replacements(categories_file: str | Path, replacements: dict[str, str]
 
 # --- turning mappings into pages to scrape --------------------------------
 
+def label_for_record(record: dict) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", record["name"].lower()).strip("-") or record["path"].rsplit("/", 1)[-1]
+
+
 def label_for(m: Mapping) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", m.name.lower()).strip("-") or m.path.rsplit("/", 1)[-1]
+    return label_for_record({"name": m.name, "path": m.path})
 
 
 def covers_for(m: Mapping) -> tuple[str, ...]:

@@ -226,8 +226,10 @@ def summary_line(
     seconds: float,
     mapping: dict | None = None,
     run_status: str | None = None,
+    paging: dict | None = None,
 ) -> str:
     """The one-line run summary. `mapping` (mapped / new / not_found counts) adds the watch-category part;
+    `paging` (cut_short / extra_pages counts, see scraper/page_limits.py) adds the page-limit part;
     `run_status` ("run posted (parts 3/3, index complete)" or "run failed (missing parts 2)") is added at the end."""
     minutes, secs = divmod(int(seconds), 60)
     watch = ""
@@ -236,10 +238,13 @@ def summary_line(
             f"watch categories mapped {mapping['mapped']}, newly mapped {mapping['new']}, "
             f"not found {mapping['not_found']}, "
         )
+    cut = ""
+    if paging is not None:
+        cut = f"categories cut short {paging['cut_short']}, extra pages read {paging['extra_pages']}, "
     return (
         f"SUMMARY: products published {products_published}, terms searched {len(outcome.searched)}, "
         f"found {len(outcome.found)}, not found {len(outcome.not_found)}, skipped {len(outcome.skipped)}, "
-        f"categories scraped {categories_scraped}, {watch}matcher {outcome.matcher}, "
+        f"categories scraped {categories_scraped}, {cut}{watch}matcher {outcome.matcher}, "
         f"found via fallback key {len(outcome.via)}, run time {minutes}m{secs:02d}s"
         + (f", {run_status}" if run_status else "")
     )

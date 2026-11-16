@@ -342,7 +342,7 @@ def test_dry_run_weekly_posts_and_saves_nothing(monkeypatch, tmp_path):
 def test_woolworths_run_browses_mapped_categories(monkeypatch, tmp_path, capsys):
     browsed = []
 
-    def fake_browse(path, max_pages, label):
+    def fake_browse(path, max_pages, label, stat=None):
         browsed.append((path, max_pages, label))
         return [{"product_id": path, "name": "Sugar", "category": label, "size": "1kg", "price": 2.0,
                  "unit_price": 2.0, "unit": "kg", "scraped_at": "2026-11-10", "supermarket": "Woolworths"}], [], 1

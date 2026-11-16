@@ -72,6 +72,7 @@ _SYNONYMS = {
     "flavour": "flavoured",
     "flavored": "flavoured",
     "flavor": "flavoured",
+    "bouillon": "stock",
 }
 
 # A product of one of these forms is not the plain ingredient ("milk" is not
@@ -115,6 +116,14 @@ _NON_NOUNS = {"style", "greek"}
 # Words that name a kind of food without saying which ("Focaccia Bread"). When
 # one is the main item, the term still matches if its words come right before.
 _GENERIC_ITEMS = {"cereal", "bread", "loaf", "sauce", "roll", "spread", "paste", "mix"}
+
+
+# Stock is sold as "Chicken Stock Liquid", "Beef Stock Cubes", "Vegetable Stock Pot":
+# the last word is the form, not the item. For a term that ends in one of these words,
+# a product naming it before such a form is a match. Powder stays a form the term must
+# name ("stock powder"), like the other forms above.
+_STOCK_ITEMS = {"stock", "broth"}
+_STOCK_FORMS = {"liquid", "cube", "pot", "concentrate", "granule", "gel", "paste"}
 
 
 def _canon(word: str) -> str:
@@ -239,6 +248,8 @@ def _main_item_match(term: _Term, name: str) -> tuple[bool, set[str]]:
     if not wanted or not found or wanted[-1] in heads:
         return True, set()
     head = found[-1]
+    if wanted[-1] in _STOCK_ITEMS and head in _STOCK_FORMS and wanted[-1] in found[:-1]:
+        return True, {head}
     if head not in _GENERIC_ITEMS or (head == "mix" and "mix" not in term.words):
         return False, set()
     before = found[:-1]

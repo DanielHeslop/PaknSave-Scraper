@@ -268,6 +268,12 @@ short delay between requests). robots.txt disallows only `/shop/search` (the HTM
 page), not `/api/v1/products`. A term is not found when the search ran and nothing
 sensible came back.
 
+Stock (liquid stock, cubes, powder) comes from the `pantry/herbs-spices-stock/stock`
+shelf, which is in `woolworths_categories.txt` as `category=stock`. Stock names put the
+form last ("Chicken Stock Liquid", "Beef Stock Cubes", "Vegetable Stock Pot"), so the
+matcher (`scraper/matching.py`) accepts a stock/broth term when the product names it
+before one of those forms. "Stock powder" still has to be asked for as powder.
+
 **robots.txt.** Every scraper fetches robots.txt once per run per site
 (`scraper/robots.py`) and skips, with a log line, any disallowed path. If
 robots.txt itself can't be fetched, the run carries on. Foodstuffs page loads
@@ -319,14 +325,45 @@ https://www.paknsave.co.nz/shop/category/pantry/pasta-rice--noodles category=pas
 ```
 
 Optional extras you can add after the URL:
-- `pages=3` — also scrape the next 2 pages of this category (PAK'nSAVE
-  paginates long category listings).
+- `pages=3` — the page limit: scrape up to 3 pages of this category (PAK'nSAVE
+  paginates long category listings). See "Page limits" below: a category that is
+  still full at its limit is read on automatically.
 - `category=name` — label these products with a specific category name
   instead of the one automatically taken from the URL.
 - `covers=word,word` — words this category holds, so a search term that
   matches nothing can fairly be reported "not found" (see above).
 
 Lines starting with `#` are comments and are ignored.
+
+## Page limits
+
+`pages=N` is a limit, not a promise that the category ends there. After the last
+page of the limit, if that page was **full**, the category is *cut short*: the
+scraper keeps reading, with the usual delays, until a page is short or empty, up
+to 20 pages per category. A full page is 50 tiles at PAK'nSAVE, 40 or more at New
+World (its pages repeat tiles, so a wrong guess costs one extra page rather than
+lost products) and 120 products at Woolworths. Reading on that finds more products
+logs one line per category, e.g. `spices: limit 3 reached, read 7 pages, 312 items`,
+and the SUMMARY line gains `categories cut short N, extra pages read N`.
+
+Real runs (`--save`) also write:
+- `data/page_stats/<store>/<date>.json` — per category: pages read, items on the
+  last page, whether it was full, and why paging ended.
+- `data/page_counts/<store>.json` — the page count each cut-short category needed.
+  Later runs use the larger of this and `pages=N`, so they read the right number of
+  pages without probing. A count is dropped when the category fits its `pages=N`
+  again. Dry runs write neither file.
+
+To see which categories were full at their limit in the latest snapshots (no
+network, writes nothing):
+
+```
+python3 -m scraper.page_limits_check [--store paknsave|newworld|woolworths]
+```
+
+A snapshot has no page boundaries, so this lists categories holding at least
+limit x full-page products. It is a pointer for where to look, not proof. Real
+paging settles it.
 
 ## Fixing a product with a wrong or missing size
 

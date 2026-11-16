@@ -12,3 +12,8 @@ pantry/tinned-foods-packets category=tinned-foods-packets covers=tinned,canned,t
 pantry/bulk-foods category=bulk-foods covers=bulk,nut,seed
 household/kitchen/kitchen-cleaners category=kitchen-cleaners covers=cleaner,spray
 household/bathroom/toilet-bathroom-cleaners category=bathroom-toilet-cleaners covers=toilet,bleach
+#
+# Stock shelf: liquid stock, stock cubes, pots and powder. The app has no watch category
+# for stock, so it is listed here. Without it only matched search results come through,
+# and the matcher used to reject names like "Chicken Stock Liquid".
+pantry/herbs-spices-stock/stock category=stock covers=stock,broth,bouillon,cube,powder

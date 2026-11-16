@@ -253,3 +253,18 @@ def test_generic_rule_still_respects_forms_and_other_words():
 def test_mix_is_generic_only_when_the_term_says_mix():
     assert _found("pancake", "Edmonds Pancake Mix") == []
     assert _found("pancake mix", "Edmonds Pancake Mix") == ["Edmonds Pancake Mix"]
+
+
+@pytest.mark.parametrize(
+    "product",
+    ["Woolworths Chicken Stock Liquid 1L", "Oxo Chicken Stock Cubes 71g", "Continental Chicken Stock Pot 4 x 28g",
+     "Gaults Chicken Stock Concentrate 105g"],
+)
+def test_stock_sold_as_liquid_cubes_pots_and_concentrate_matches_the_stock_term(product):
+    assert _found("chicken stock", product) == [product]
+
+
+def test_stock_powder_needs_the_term_to_name_powder_and_bouillon_means_stock():
+    assert _found("stock powder", "Vegeta Chicken Stock Powder") == ["Vegeta Chicken Stock Powder"]
+    assert _found("beef bouillon cube", "Oxo Beef Stock Cubes 71g") == ["Oxo Beef Stock Cubes 71g"]
+    assert _found("beef stock", "Oxo Chicken Stock Cubes 71g") == []

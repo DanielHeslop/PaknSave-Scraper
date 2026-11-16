@@ -31,15 +31,22 @@ def test_categories_file_parses_options(tmp_path):
     assert pages[1].label == "kitchen-cleaners" and pages[1].max_pages == 5
 
 
-def test_shipped_categories_file_has_the_six_watch_paths():
+def test_shipped_categories_file_has_the_six_watch_paths_and_the_stock_shelf():
     paths = {p.path for p in woolworths.parse_categories_file(woolworths.DEFAULT_CATEGORIES_PATH)}
     assert paths == {
         "pantry/baking", "pantry/oil-vinegar-condiments", "pantry/tinned-foods-packets", "pantry/bulk-foods",
-        "household/kitchen/kitchen-cleaners", "household/bathroom/toilet-bathroom-cleaners"}
+        "household/kitchen/kitchen-cleaners", "household/bathroom/toilet-bathroom-cleaners",
+        "pantry/herbs-spices-stock/stock"}
+
+
+def test_the_stock_shelf_is_browsed_and_labelled_stock():
+    pages = {p.path: p for p in woolworths.parse_categories_file(woolworths.DEFAULT_CATEGORIES_PATH)}
+    stock = pages["pantry/herbs-spices-stock/stock"]
+    assert stock.label == "stock" and {"stock", "cube", "powder"} <= set(stock.covers)
 
 
 def test_browse_all_dedupes_and_survives_a_bad_path(monkeypatch):
-    def fake(path, max_pages, label):
+    def fake(path, max_pages, label, stat=None):
         if path == "bad":
             raise RuntimeError("boom")
         return [_p("1", "Sugar"), _p("2", "Flour")], [], 2
@@ -85,7 +92,7 @@ def test_search_all_respects_deadline(monkeypatch):
 
 def _run_main(monkeypatch, tmp_path, *, search_raises=False, save=True):
     published, reported = [], []
-    monkeypatch.setattr(woolworths, "browse_products", lambda path, mp, label: ([_p("1", "Sugar")], [], 1))
+    monkeypatch.setattr(woolworths, "browse_products", lambda path, mp, label, stat=None: ([_p("1", "Sugar")], [], 1))
     monkeypatch.setattr(woolworths, "search_products", lambda t, size: ([_p("1", "Sugar"), _p("9", "Rice")], []))
     lists = StoreLists(store="woolworths", search_terms=["rice", "sugar", "skipme"], watch_terms=["soap"],
                        skip=frozenset({"skipme"}))

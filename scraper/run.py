@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-import dataclasses
 import sys
 from datetime import date
 
@@ -35,7 +34,9 @@ from scraper.browser import (
     stealth_playwright,
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
+from scraper import page_limits
 from scraper.overrides import get_override, load_overrides
+from scraper.page_limits import PageStat
 from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
 from scraper.robots import RobotsGuard
 from scraper.storage import update_price_history, write_snapshot
@@ -142,12 +143,15 @@ async def scrape_all(
     guard = guard or RobotsGuard()
     overrides = load_overrides(overrides_path)
     category_pages = parse_categories_file(categories_path) + list(extra_pages or [])
+    starts = [p for p in category_pages if p.page == 1]
+    remembered = page_limits.load_page_counts(site)
+    page_stats: list[PageStat] = []
 
     if not category_pages:
         log(f"No categories found in {categories_path} - nothing to scrape.")
         return {"products": [], "stats": _empty_stats(), "scraped_categories": {}, "scraped_at": now_nz_iso()}
 
-    log(f"{len(category_pages)} page(s) to be scraped.")
+    log(f"{len(starts)} categories to be scraped.")
 
     products: list[dict] = []
     dropped_reasons: list[str] = []
@@ -178,64 +182,96 @@ async def scrape_all(
         page = await context.new_page()
 
         loaded_any = False
-        i = 0
-        while i < len(category_pages):
-            category_page = category_pages[i]
-            i += 1
-            log(f"\n[{i}/{len(category_pages)}] {category_page.category} - {category_page.url}")
-            if not guard.allows(category_page.url):
-                skipped_pages.append(category_page.url)
-                robots_skipped.append(category_page.url)
-                continue
-            if loaded_any:
-                await polite_pause()
-            loaded_any = True
-            try:
-                await navigate_and_wait_ready(page, category_page.url, log)
-            except PageLoadTimeout as e:
-                log(f"  PAGE SKIPPED: {e}")
-                skipped_pages.append(category_page.url)
-                continue
+        pages_loaded = 0
+        for number, first in enumerate(starts, 1):
+            path = foodstuffs_path_of(first.url)
+            stat = PageStat(
+                label=first.category, path=path, configured=first.max_pages,
+                limit=max(first.max_pages, remembered.get(path, 0)),
+            )
+            page_stats.append(stat)
+            base_url = first.url.split("?")[0]
+            seen_ids: set[str] = set()
+            n = 0
+            while n < page_limits.SAFETY_CAP_PAGES:
+                n += 1
+                url = first.url if n == 1 else f"{base_url}?pg={n}"
+                log(f"\n[{number}/{len(starts)}] {first.category} page {n} - {url}")
+                if not guard.allows(url):
+                    skipped_pages.append(url)
+                    robots_skipped.append(url)
+                    stat.ended = page_limits.ROBOTS
+                    break
+                if loaded_any:
+                    await polite_pause()
+                loaded_any = True
+                try:
+                    await navigate_and_wait_ready(page, url, log)
+                except PageLoadTimeout as e:
+                    # A Foodstuffs page past the end of a category loads as a timeout, so
+                    # one past the page limit is taken as the end, not as a failure.
+                    if n > stat.limit:
+                        log(f"  page {n} did not load ({e}) - taken as the end of the category")
+                    else:
+                        log(f"  PAGE SKIPPED: {e}")
+                        skipped_pages.append(url)
+                    stat.ended = page_limits.LOAD_FAILED
+                    break
+                pages_loaded += 1
 
-            scraped_categories.setdefault(category_page.category, category_page.covers)
-            tiles = await find_product_tiles(page)
-            log(f"  {len(tiles)} product tile(s) found")
+                scraped_categories.setdefault(first.category, first.covers)
+                tiles = await find_product_tiles(page)
+                log(f"  {len(tiles)} product tile(s) found")
 
-            page_ids: set[str] = set()
-            for tile in tiles:
-                result: ExtractResult = await extract_product(
-                    tile, category_page.category, scraped_at, site_config.supermarket
-                )
+                page_ids: set[str] = set()
+                for tile in tiles:
+                    result: ExtractResult = await extract_product(
+                        tile, first.category, scraped_at, site_config.supermarket
+                    )
 
-                if result.drop_reason:
-                    dropped_reasons.append(result.drop_reason)
-                    continue
-
-                product = result.product
-                override = get_override(overrides, product["supermarket"], product["product_id"])
-                if override is not None:
-                    if override.skip:
-                        dropped_reasons.append(f"{product['product_id']} {product['name']} - excluded via overrides.txt")
+                    if result.drop_reason:
+                        dropped_reasons.append(result.drop_reason)
                         continue
-                    product = apply_override(product, override)
 
-                valid, reason = is_valid_product(product)
-                if not valid:
-                    dropped_reasons.append(f"{product['product_id']} {product['name']} - {reason}")
-                    continue
+                    product = result.product
+                    override = get_override(overrides, product["supermarket"], product["product_id"])
+                    if override is not None:
+                        if override.skip:
+                            dropped_reasons.append(f"{product['product_id']} {product['name']} - excluded via overrides.txt")
+                            continue
+                        product = apply_override(product, override)
 
-                product["store_category"] = foodstuffs_path_of(category_page.url)
-                products.append(product)
-                page_ids.add(product["product_id"])
+                    valid, reason = is_valid_product(product)
+                    if not valid:
+                        dropped_reasons.append(f"{product['product_id']} {product['name']} - {reason}")
+                        continue
 
-            next_page = _next_page(category_page, len(tiles), page_ids)
-            if next_page is not None:
-                category_pages.insert(i, next_page)
+                    product["store_category"] = path
+                    products.append(product)
+                    page_ids.add(product["product_id"])
+
+                if not tiles:
+                    stat.ended = page_limits.EMPTY_PAGE
+                    break
+                new_ids = page_ids - seen_ids
+                if not new_ids:
+                    stat.ended = page_limits.REPEAT_PAGE
+                    break
+                seen_ids |= page_ids
+                full = len(tiles) >= site_config.full_page_tiles
+                page_limits.note_page(stat, n, len(tiles), len(new_ids), full)
+                if not full:
+                    stat.ended = page_limits.SHORT_PAGE
+                    break
+            else:
+                stat.ended = page_limits.SAFETY_CAP
+            page_limits.log_cut_short([stat], log)
 
         await browser.close()
 
+    counts = page_limits.cut_short_counts(page_stats)
     stats = {
-        "pages_scraped": len(category_pages) - len(skipped_pages),
+        "pages_scraped": pages_loaded,
         "pages_skipped": skipped_pages,
         "robots_skipped": robots_skipped,
         "categories_scraped": len(scraped_categories),
@@ -244,27 +280,16 @@ async def scrape_all(
         "products_with_unit_price": sum(1 for p in products if p["unit_price"] is not None),
         "products_without_unit_price": sum(1 for p in products if p["unit_price"] is None),
         "products_dropped": dropped_reasons,
+        "categories_cut_short": counts["cut_short"],
+        "extra_pages_read": counts["extra_pages"],
     }
-    return {"products": products, "stats": stats, "scraped_categories": scraped_categories, "scraped_at": scraped_at_nz}
-
-
-def _next_page(page: CategoryPage, tile_count: int, page_ids: set[str]) -> CategoryPage | None:
-    """The page after this one, for a mapped watch category that is followed page by page.
-
-    None when the category isn't paged this way, the limit is reached, the page was
-    empty, held nothing new, or was shorter than the first page (so the last page).
-    """
-    if page.max_pages <= page.page or tile_count == 0:
-        return None
-    first = page.first_page_tiles or tile_count
-    new_ids = page_ids - page.seen_ids
-    page.seen_ids.update(page_ids)
-    if not new_ids or tile_count < first:
-        return None
-    base_url = page.url.split("?")[0]
-    return dataclasses.replace(
-        page, url=f"{base_url}?pg={page.page + 1}", page=page.page + 1, first_page_tiles=first
-    )
+    return {
+        "products": products,
+        "stats": stats,
+        "scraped_categories": scraped_categories,
+        "scraped_at": scraped_at_nz,
+        "page_stats": page_stats,
+    }
 
 
 def _empty_stats() -> dict:
@@ -278,6 +303,8 @@ def _empty_stats() -> dict:
         "products_with_unit_price": 0,
         "products_without_unit_price": 0,
         "products_dropped": [],
+        "categories_cut_short": 0,
+        "extra_pages_read": 0,
     }
 
 
@@ -310,6 +337,8 @@ def print_summary(stats: dict) -> None:
     print(f"Products saved             : {stats['products_saved']}")
     print(f"  - with a unit price      : {stats['products_with_unit_price']}")
     print(f"  - without a unit price   : {stats['products_without_unit_price']} (expected for e.g. 'each' items)")
+    print(f"Categories cut short       : {stats.get('categories_cut_short', 0)}")
+    print(f"Extra pages read           : {stats.get('extra_pages_read', 0)}")
     print(f"Products dropped entirely  : {len(stats['products_dropped'])}")
     for reason in stats["products_dropped"]:
         print(f"  - {reason}")
@@ -338,6 +367,7 @@ async def main_async(args: argparse.Namespace) -> int:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(products, args.snapshots_dir, today)
         write_scrape_meta(snapshot_path, result["scraped_at"])
+        page_limits.save_page_stats(args.site, result["page_stats"], log)
         _, new_entries = update_price_history(products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")

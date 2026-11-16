@@ -35,6 +35,7 @@ from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.price_runs import now_nz_iso, post_snapshot_file, publish_run, write_scrape_meta
 from scraper.browser import SITES, parse_categories_file
 from scraper.robots import RobotsGuard
+from scraper import page_limits
 from scraper.run import DEFAULT_HISTORY_PATH, DEFAULT_OVERRIDES_PATH, resolve_site_defaults, scrape_all
 from scraper.run import print_summary as print_category_summary
 from scraper.run import print_table as print_category_table
@@ -170,6 +171,7 @@ async def main_async(args: argparse.Namespace) -> int:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(dedupe_products(category_products), args.snapshots_dir, today)
         write_scrape_meta(snapshot_path, scraped_at)
+        page_limits.save_page_stats(args.site, category_result.get("page_stats", []), log)
         _, new_entries = update_price_history(category_products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
         log(f"Price history updated: {new_entries} new entr{'y' if new_entries == 1 else 'ies'} added")
@@ -211,6 +213,7 @@ async def main_async(args: argparse.Namespace) -> int:
             time.monotonic() - started,
             mapping.counts() if mapping else None,
             run_status,
+            page_limits.cut_short_counts(category_result.get("page_stats", [])),
         )
     )
     return 0

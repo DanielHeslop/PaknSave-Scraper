@@ -46,6 +46,7 @@ from datetime import date
 
 import requests
 
+from scraper import page_limits
 from scraper.robots import RobotsDisallowed, RobotsGuard
 from scraper.store_category import woolworths_category
 
@@ -342,19 +343,27 @@ def browse_url_filters(path: str) -> list[tuple[str, str]]:
     ]
 
 
-def browse_products(path: str, max_pages: int = 5, label: str | None = None) -> tuple[list[dict], list[str], int]:
+def browse_products(
+    path: str, max_pages: int = 5, label: str | None = None, stat: page_limits.PageStat | None = None
+) -> tuple[list[dict], list[str], int]:
     """Read one browse path (department/aisle/shelf) from the public browse API.
 
     Returns (products, skip_reasons, total_items_reported). Pages of 120 are read
-    until the total is covered or max_pages is hit; every request goes through
-    the throttle and the robots guard.
+    until the total is covered. `max_pages` is the page limit: if the last page at the
+    limit is full and the total says there is more, the path is cut short, and pages
+    are read on (up to page_limits.SAFETY_CAP_PAGES). Every request goes through the
+    throttle and the robots guard. `stat`, if given, is filled in with the paging record.
     """
     session = _new_session()
     fallback = label or path.strip("/").split("/")[-1]
     products: list[dict] = []
     skip_reasons: list[str] = []
     total = 0
-    for page in range(1, max_pages + 1):
+    if stat is None:
+        stat = page_limits.PageStat(label=fallback, path=path, configured=max_pages, limit=max_pages)
+    elif stat.limit < max_pages:
+        stat.limit = max_pages
+    for page in range(1, page_limits.SAFETY_CAP_PAGES + 1):
         params = [
             ("target", "browse"),
             *browse_url_filters(path),
@@ -372,7 +381,19 @@ def browse_products(path: str, max_pages: int = 5, label: str | None = None) -> 
                 skip_reasons.append(reason)
             else:
                 products.append(product)
-        if not items or page * BROWSE_PAGE_SIZE >= total:
+        if not items:
+            stat.ended = page_limits.EMPTY_PAGE
+            break
+        full = len(items) >= BROWSE_PAGE_SIZE
+        page_limits.note_page(stat, page, len(items), len(items), full)
+        if page * BROWSE_PAGE_SIZE >= total:
+            stat.ended = page_limits.ALL_READ
+            break
+        if page >= stat.limit and not full:
+            stat.ended = page_limits.SHORT_PAGE
+            break
+        if page >= page_limits.SAFETY_CAP_PAGES:
+            stat.ended = page_limits.SAFETY_CAP
             break
     return products, skip_reasons, total
 
