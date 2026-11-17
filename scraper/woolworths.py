@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from scraper import page_limits
+from scraper import cooking_wine, page_limits
 from scraper.category_mapping import Mapping, MappingResult, covers_for, label_for, sync_and_map
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
@@ -213,7 +213,9 @@ def browse_all(pages: list[BrowsePage]) -> dict:
         page_limits.log_cut_short([stat], log)
         log(f"  {len(found)} of {total} product(s) read, {len(skip_reasons)} skipped")
         dropped.extend(f"[{page.path}] {r}" for r in skip_reasons)
-        products.extend(_keep_valid(found, dropped))
+        shelf = _keep_valid(found, dropped)
+        shelf, _ = cooking_wine.select_for_shelf(page.path, shelf, log)
+        products.extend(shelf)
         scraped.setdefault(page.label, page.covers)
     products = dedupe_products(products)
     counts = page_limits.cut_short_counts(page_stats)

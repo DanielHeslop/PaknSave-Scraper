@@ -22,7 +22,7 @@ import re
 _STOPWORDS = {
     "a", "an", "and", "or", "of", "to", "in", "on", "at", "for", "with",
     "from", "into", "about", "if", "only", "each", "plus", "the", "your",
-    "as", "than", "such", "e.g", "eg",
+    "as", "than", "such", "e.g", "eg", "per",
 }
 
 _WORD_PATTERN = re.compile(r"[a-z]+")
@@ -144,10 +144,41 @@ def _significant_words_ordered(text: str) -> list[str]:
     return [w for w in _WORD_PATTERN.findall(text.lower()) if len(w) >= 3 and w not in _STOPWORDS]
 
 
+# Mussels sold in the shell. Stores name them "Live Greenshell Mussels Whole Shell 1kg",
+# "Fresh Mussels (per kg)" and so on: "live" and "fresh" mean the same here, and a trailing
+# "shell" must not become the product's main item. A term that asks for fresh, live, raw or
+# in-shell mussels does not take preserved, cooked, frozen, half-shell or meat-only products.
+_MUSSEL = re.compile(r"\bmussels?\b")
+_FRESH_MUSSEL_WORDS = re.compile(r"\b(fresh|live|raw|shells?)\b")
+_HALF_SHELL = re.compile(r"\bhalf[\s-]*shell(?:ed)?\b")
+_NOT_IN_SHELL_FRESH = re.compile(
+    r"\b(marinated|smoked|meats?|canned|tinned|pickled|battered|crumbed|stuffed|cooked|frozen|"
+    r"oil|brine|sauces?|garlic|chilli|chowder|pate)\b"
+)
+
+
+def _mussel_text(text: str) -> str:
+    """Lowercase text with 'live' read as 'fresh' and shell/raw/whole/greenshell left out (mussel text only).
+
+    Those words trail the real item ("Greenshell Mussels Raw Whole Shell", "Mills Bay Mussels Greenshell"),
+    so left in they would be taken for the product's main noun.
+    """
+    low = text.lower()
+    if not _MUSSEL.search(low):
+        return text
+    return re.sub(r"\b(?:shells?|whole|raw|greenshell)\b", " ", re.sub(r"\blive\b", "fresh", low))
+
+
 class _Term:
     def __init__(self, term: str):
+        low = term.lower()
+        self.fresh_mussel = bool(_MUSSEL.search(low) and _FRESH_MUSSEL_WORDS.search(low))
+        term = _mussel_text(term)
         self.text = term
         self.words = _term_words(term)
+        if self.fresh_mussel:
+            # "fresh" / "live" is checked by the preserved-form rule in _matches, not by the product naming it.
+            self.words = [w for w in self.words if w != "fresh"]
         self.forms = {w for w in self.words if w in _FORMS}
         self.has_joiner = bool(re.search(r"&|\band\b", term.lower()))
         self.has_descriptors = any(w in _DESCRIPTORS for w in self.words)
@@ -266,6 +297,11 @@ def _matches(term: _Term, name: str, drop_descriptors: bool) -> bool:
     required = term.required(drop_descriptors)
     if not required or all(w in _GENERIC for w in required):
         return False
+    if term.fresh_mussel and _MUSSEL.search(name.lower()):
+        low = name.lower()
+        if _HALF_SHELL.search(low) or _NOT_IN_SHELL_FRESH.search(low):
+            return False
+    name = _mussel_text(name)
     everything, plain = _product_words(name)
     available = everything if term.has_joiner else plain
     if not all(w in available for w in required):

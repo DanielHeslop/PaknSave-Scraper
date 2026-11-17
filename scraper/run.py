@@ -34,7 +34,7 @@ from scraper.browser import (
     stealth_playwright,
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
-from scraper import page_limits
+from scraper import cooking_wine, page_limits
 from scraper.overrides import get_override, load_overrides
 from scraper.page_limits import PageStat
 from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
@@ -183,6 +183,7 @@ async def scrape_all(
 
         loaded_any = False
         pages_loaded = 0
+        wines_set_aside = 0
         for number, first in enumerate(starts, 1):
             path = foodstuffs_path_of(first.url)
             stat = PageStat(
@@ -192,6 +193,7 @@ async def scrape_all(
             page_stats.append(stat)
             base_url = first.url.split("?")[0]
             seen_ids: set[str] = set()
+            shelf_start = len(products)
             n = 0
             while n < page_limits.SAFETY_CAP_PAGES:
                 n += 1
@@ -266,6 +268,10 @@ async def scrape_all(
             else:
                 stat.ended = page_limits.SAFETY_CAP
             page_limits.log_cut_short([stat], log)
+            if cooking_wine.is_wine_shelf(path):
+                kept, set_aside = cooking_wine.select_for_shelf(path, products[shelf_start:], log)
+                products[shelf_start:] = kept
+                wines_set_aside += set_aside
 
         await browser.close()
 
@@ -275,7 +281,7 @@ async def scrape_all(
         "pages_skipped": skipped_pages,
         "robots_skipped": robots_skipped,
         "categories_scraped": len(scraped_categories),
-        "products_found": len(products) + len(dropped_reasons),
+        "products_found": len(products) + len(dropped_reasons) + wines_set_aside,
         "products_saved": len(products),
         "products_with_unit_price": sum(1 for p in products if p["unit_price"] is not None),
         "products_without_unit_price": sum(1 for p in products if p["unit_price"] is None),

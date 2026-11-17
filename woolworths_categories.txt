@@ -17,3 +17,13 @@ household/bathroom/toilet-bathroom-cleaners category=bathroom-toilet-cleaners co
 # for stock, so it is listed here. Without it only matched search results come through,
 # and the matcher used to reject names like "Chicken Stock Liquid".
 pantry/herbs-spices-stock/stock category=stock covers=stock,broth,bouillon,cube,powder
+
+# --- Fresh herbs, seafood (in-shell mussels) and cooking wine ---
+# Wine: the whole cask wine shelf is kept; on white-wine and red-wine only the cheapest 5 per shelf
+# by price per litre are kept (scraper/cooking_wine.py).
+fruit-veg/fresh-salad-herbs category=fresh-herbs covers=herb,herbs,coriander,cilantro,dill,parsley,basil,mint,chive,chives,thyme,rosemary,sage,salad
+fish-seafood/prawns-seafood category=seafood covers=seafood,fish,prawn,shrimp,mussel,shellfish,oyster,crab,squid
+fish-seafood/fish category=fish covers=fish,salmon,snapper,hoki,cod,tuna
+beer-wine/cask-wine category=cask-wine
+beer-wine/white-wine category=white-wine
+beer-wine/red-wine category=red-wine

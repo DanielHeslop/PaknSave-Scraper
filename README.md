@@ -365,6 +365,28 @@ A snapshot has no page boundaries, so this lists categories holding at least
 limit x full-page products. It is a pointer for where to look, not proof. Real
 paging settles it.
 
+## Fresh herbs, mussels in the shell and cooking wine
+
+- **Fresh herbs.** The whole fresh salad and herbs shelf is scraped at every store
+  (`fruit-and-vegetables/fresh-salad--herbs` at Pak'nSave and New World,
+  `fruit-veg/fresh-salad-herbs` at Woolworths), label `fresh-herbs`.
+- **Mussels in the shell.** They sit on the seafood shelf, which is scraped at every
+  store (Woolworths: `fish-seafood/prawns-seafood` and `fish-seafood/fish`). The local
+  matcher reads "live" as "fresh", ignores "shell", "whole shell" and "per kg", and
+  does not give a fresh, live or in-shell mussel term the marinated, smoked, canned,
+  cooked, frozen, half-shell or meat-only products (`scraper/matching.py`). If a store has
+  none on the shelf that week, none are posted.
+- **Cooking wine** (`scraper/cooking_wine.py`). The whole cask wine shelf is kept. On the
+  white-wine and red-wine shelves every page is read (the page-limit rule above reads on
+  past a full last page), then only the cheapest 5 per shelf by price per litre are
+  kept. Sparkling, fortified, flavoured, dessert, moscato, non-alcoholic, gift packs
+  and wines with no price per litre are never kept. No sort parameter is used on the
+  site; the shelf is read whole and sorted here. Ranking uses the public shelf price,
+  never a member price. Pak'nSave and New World tiles show no unit price on wine, so
+  the per-litre price is worked out from the pack size (`$7.99 / 750 ml = $10.65/L`)
+  and written as the item's unit price. A store's own unit price is never replaced.
+  Wine is bought without logging in or an age check, so nothing here needs either.
+
 ## Fixing a product with a wrong or missing size
 
 Sometimes a specific product's size can't be read correctly from the page.

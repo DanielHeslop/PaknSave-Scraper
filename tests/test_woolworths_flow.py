@@ -31,12 +31,14 @@ def test_categories_file_parses_options(tmp_path):
     assert pages[1].label == "kitchen-cleaners" and pages[1].max_pages == 5
 
 
-def test_shipped_categories_file_has_the_six_watch_paths_and_the_stock_shelf():
+def test_shipped_categories_file_has_the_watch_paths_the_stock_shelf_herbs_seafood_and_wine():
     paths = {p.path for p in woolworths.parse_categories_file(woolworths.DEFAULT_CATEGORIES_PATH)}
     assert paths == {
         "pantry/baking", "pantry/oil-vinegar-condiments", "pantry/tinned-foods-packets", "pantry/bulk-foods",
         "household/kitchen/kitchen-cleaners", "household/bathroom/toilet-bathroom-cleaners",
-        "pantry/herbs-spices-stock/stock"}
+        "pantry/herbs-spices-stock/stock",
+        "fruit-veg/fresh-salad-herbs", "fish-seafood/prawns-seafood", "fish-seafood/fish",
+        "beer-wine/cask-wine", "beer-wine/white-wine", "beer-wine/red-wine"}
 
 
 def test_the_stock_shelf_is_browsed_and_labelled_stock():

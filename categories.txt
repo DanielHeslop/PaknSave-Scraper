@@ -93,3 +93,14 @@ https://www.paknsave.co.nz/shop/category/pantry/oil--vinegar/cooking-oil categor
 https://www.paknsave.co.nz/shop/category/pantry/baking-supplies--sugar/baking-nuts--seeds category=baking-nuts covers=pecan,almond,walnut,hazelnut,pistachio,cashew,nut,seed
 https://www.paknsave.co.nz/shop/category/hot-and-cold-drinks/juice--smoothies/fruit-juice category=fruit-juice covers=juice,apple
 https://www.paknsave.co.nz/shop/category/bakery/burger-buns-rolls--garlic-bread/burger-buns--bread-rolls category=burger-buns covers=burger,bun,brioche,roll
+
+# --- Fresh herbs, in-shell mussels and cooking wine ---
+# Fresh herbs: the whole shelf (coriander, dill, parsley, basil, mint, chives, thyme, rosemary).
+# Wine: the whole cask wine shelf is kept. On the white-wine and red-wine shelves every page is read
+# (a full last page is read on) and only the cheapest 5 per shelf by price per litre are kept
+# (scraper/cooking_wine.py). No sort parameter is used.
+# Mussels in the shell are on the seafood shelf above.
+https://www.paknsave.co.nz/shop/category/fruit-and-vegetables/fresh-salad--herbs category=fresh-herbs covers=herb,herbs,coriander,cilantro,dill,parsley,basil,mint,chive,chives,thyme,rosemary,sage,salad
+https://www.paknsave.co.nz/shop/category/beer-wine-and-cider/cask-wine category=cask-wine
+https://www.paknsave.co.nz/shop/category/beer-wine-and-cider/white-wine category=white-wine
+https://www.paknsave.co.nz/shop/category/beer-wine-and-cider/red-wine category=red-wine
