@@ -1,4 +1,9 @@
-"""Honestly decide whether a search result actually matches what was searched for.
+"""The local backup matcher: honestly decide whether a product matches a search term.
+
+The app's own matcher (POST /api/match-terms, scraper/app_matcher.py) decides found /
+not found. This module runs only when that call can't be had (network, timeout,
+5xx, missing env), so its rules - including the stock and mussel ones - are a
+frozen copy kept for that case and are not updated when the app's rules change.
 
 Deliberately simple, on purpose: this is not a fuzzy/similarity matcher. It
 only checks whether a meaningful word from the searched ingredient name

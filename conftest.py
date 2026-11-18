@@ -21,6 +21,11 @@ def _no_real_app_matcher(monkeypatch):
     monkeypatch.delenv("MAILBOX_URL", raising=False)
     monkeypatch.delenv("MAILBOX_TOKEN", raising=False)
 
+    import scraper.app_matcher as app_matcher
+
+    app_matcher.clear_cache()
+    monkeypatch.setattr(app_matcher.time, "sleep", lambda seconds: None)
+
 
 @pytest.fixture(autouse=True)
 def _isolated_category_state(monkeypatch, tmp_path):

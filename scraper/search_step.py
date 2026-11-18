@@ -63,6 +63,7 @@ class SearchOutcome:
     skipped: list[str] = field(default_factory=list)  # app says skip
     unsearched: list[str] = field(default_factory=list)  # ran out of time
     matcher: str = "none"  # "app <version>", "local fallback", or "none" if nothing was searched
+    fallback_reason: str | None = None  # why the app matcher wasn't used (set with "local fallback")
     via: dict[str, str] = field(default_factory=dict)  # term -> fallback key that found it (app matcher only)
 
     @property
@@ -142,17 +143,28 @@ def local_fallback(reason: str) -> None:
     log(f"App matcher unavailable ({reason}) - using the local matcher for this run.")
 
 
-def try_app_match(store: str, terms: list[str], products: list[dict]) -> AppMatches | None:
-    """The app's verdict on every term, or None (after one log line) if it can't be had."""
+def try_app_match(
+    store: str, terms: list[str], products: list[dict], rules_version: str | None = None
+) -> tuple[AppMatches | None, str | None]:
+    """(the app's verdict on every term, None), or (None, why not) after one log line.
+
+    rules_version is the matchRules version the run's list came with; if the app answers
+    with a different one, its rules changed during the run and its answer is the one used.
+    """
     if not terms:
-        return None
+        return None, None
     try:
-        return match_terms(store, terms, products)
+        matches = match_terms(store, terms, products)
     except AppMatchError as e:
-        local_fallback(str(e))
+        reason = str(e)
     except Exception as e:
-        local_fallback(f"unexpected error, {type(e).__name__}")
-    return None
+        reason = f"unexpected error, {type(e).__name__}"
+    else:
+        if rules_version and matches.version != rules_version:
+            log(f"App matchRules version changed during the run ({rules_version} -> {matches.version}); using the new one.")
+        return matches, None
+    local_fallback(reason)
+    return None, reason
 
 
 def outcome_from_app(
@@ -184,15 +196,17 @@ def search_products_for_terms(
     products: list[dict],
     scraped_words: set[str],
     deadline: float | None = None,
+    rules_version: str | None = None,
 ) -> SearchOutcome:
     """Foodstuffs search step: the app's matcher, or the local one if the app can't be used."""
     products = dedupe_products(products)
-    matches = try_app_match(store, terms, products)
+    matches, reason = try_app_match(store, terms, products, rules_version)
     if matches is not None:
         return outcome_from_app(matches, terms, products, lambda t: term_has_scraped_home(t, scraped_words))
     outcome = local_search(terms, products, scraped_words, deadline)
     if terms:
         outcome.matcher = "local fallback"
+        outcome.fallback_reason = reason
     return outcome
 
 
@@ -245,6 +259,8 @@ def summary_line(
         f"SUMMARY: products published {products_published}, terms searched {len(outcome.searched)}, "
         f"found {len(outcome.found)}, not found {len(outcome.not_found)}, skipped {len(outcome.skipped)}, "
         f"categories scraped {categories_scraped}, {cut}{watch}matcher {outcome.matcher}, "
-        f"found via fallback key {len(outcome.via)}, run time {minutes}m{secs:02d}s"
+        f"found via fallback key {len(outcome.via)}, "
+        + (f"app matcher unavailable ({outcome.fallback_reason}), " if outcome.fallback_reason else "")
+        + f"run time {minutes}m{secs:02d}s"
         + (f", {run_status}" if run_status else "")
     )

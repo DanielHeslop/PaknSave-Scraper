@@ -161,23 +161,23 @@ def test_chunk_merge_prefers_direct_matches_over_via(configured, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "error, expected",
+    "error, expected, tries",
     [
-        (_http_error(401, "Unauthorized"), "status 401"),
-        (_http_error(500, "Internal Server Error"), "status 500"),
-        (TimeoutError(), "timed out after 30s"),
-        (urllib.error.URLError(TimeoutError()), "timed out after 30s"),
-        (urllib.error.URLError("no route"), "could not connect"),
+        (_http_error(401, "Unauthorized"), "status 401", 1),
+        (_http_error(500, "Internal Server Error"), "status 500", 3),
+        (TimeoutError(), "timed out after 30s", 3),
+        (urllib.error.URLError(TimeoutError()), "timed out after 30s", 3),
+        (urllib.error.URLError("no route"), "could not connect", 3),
     ],
 )
-def test_failures_fall_back_to_the_local_matcher(configured, monkeypatch, capsys, error, expected):
+def test_failures_fall_back_to_the_local_matcher(configured, monkeypatch, capsys, error, expected, tries):
     app = _install(monkeypatch, FakeApp(error=error))
     products = [_p("P1", "Garlic Bulb")]
     outcome = search_products_for_terms("paknsave", ["garlic", "saffron"], products, category_words("veg", ("saffron",)))
 
     out = capsys.readouterr().out
-    assert len(app.requests) == 1
-    assert outcome.matcher == "local fallback"
+    assert len(app.requests) == tries
+    assert outcome.matcher == "local fallback" and expected in outcome.fallback_reason
     assert list(outcome.found) == ["garlic"] and outcome.not_found == ["saffron"]
     lines = [line for line in out.splitlines() if "App matcher unavailable" in line]
     assert len(lines) == 1 and expected in lines[0]
@@ -185,6 +185,7 @@ def test_failures_fall_back_to_the_local_matcher(configured, monkeypatch, capsys
 
 
 def test_slow_reply_over_the_overall_limit_times_out(configured, monkeypatch):
+    monkeypatch.setattr(app_matcher, "RETRY_DELAYS", ())
     clock = iter([0.0, 31.0, 31.0, 31.0])
     monkeypatch.setattr(app_matcher.time, "monotonic", lambda: next(clock))
     _install(monkeypatch, FakeApp())

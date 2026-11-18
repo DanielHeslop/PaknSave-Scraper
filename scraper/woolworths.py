@@ -279,7 +279,9 @@ def search_all(
     return outcome, blocked
 
 
-def apply_app_matcher(outcome: SearchOutcome, products: list[dict]) -> SearchOutcome:
+def apply_app_matcher(
+    outcome: SearchOutcome, products: list[dict], rules_version: str | None = None
+) -> SearchOutcome:
     """Re-decide found / not-found for the searched terms with the app's matcher.
 
     products are the browse products plus everything the searches returned. A term
@@ -287,9 +289,10 @@ def apply_app_matcher(outcome: SearchOutcome, products: list[dict]) -> SearchOut
     if the app can't be used the local per-term outcome is kept unchanged.
     """
     products = dedupe_products(products)
-    matches = try_app_match(STORE, outcome.searched, products)
+    matches, reason = try_app_match(STORE, outcome.searched, products, rules_version)
     if matches is None:
-        outcome.matcher = "local fallback" if outcome.searched else outcome.matcher
+        if outcome.searched:
+            outcome.matcher, outcome.fallback_reason = "local fallback", reason
         return outcome
     search_failed = set(outcome.unreported)
     rebuilt = outcome_from_app(matches, outcome.searched, products, lambda t: t not in search_failed)
@@ -323,7 +326,9 @@ def run_search_step(
     collected: list[dict] = []
     outcome, blocked = search_all(terms, args.size, deadline, collected)
     outcome.skipped = skipped
-    outcome = apply_app_matcher(outcome, list(browse_products_list or []) + collected)
+    outcome = apply_app_matcher(
+        outcome, list(browse_products_list or []) + collected, lists.match_rules_version if lists else None
+    )
     log_outcome(outcome)
     if not reportable:
         pass

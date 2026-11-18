@@ -246,7 +246,9 @@ def run_search_step(
     for label, covers in scraped_categories.items():
         scraped_words |= category_words(label, covers)
 
-    outcome = search_products_for_terms(store, terms, products, scraped_words, deadline)
+    outcome = search_products_for_terms(
+        store, terms, products, scraped_words, deadline, lists.match_rules_version
+    )
     outcome.skipped = skipped
     log_outcome(outcome)
 

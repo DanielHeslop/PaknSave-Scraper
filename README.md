@@ -222,16 +222,25 @@ run to the app's own matcher (`POST <site>/api/match-terms`, `scraper/app_matche
 `<site>` is the origin of `MAILBOX_URL`, Bearer `MAILBOX_TOKEN`; split into calls of
 at most 300 terms and 6,000 products). So the app and the Pi agree. A term the app
 found only through a fallback key is logged ("tamari: found via soy sauce"). If the
-call fails for any reason (network, 30s timeout, any non-200) the run logs one line
-and uses the local matcher below for the rest of the run; the run never fails
-because of the endpoint. Not-found is still reported only when the term's category
+call fails (network, 30s timeout, 5xx and 429 are retried twice, after 2s and 6s or
+the server's Retry-After, at most 30s; other non-200 replies are not) the run logs
+one line and uses the local matcher below for the rest of the run, and the `SUMMARY:`
+line says why; the run never fails because of the endpoint. Answers are cached for the
+run (same store, same products, same term: no second call), and the cache is dropped
+if the app's rules version changes. The app's `matchRules.version` comes with the
+`?store=` list each run; if the endpoint answers with a different one the run logs it
+and uses the endpoint's answer. The scraper reads only that version, not the word
+lists: part of the app's rules now live in its code, so the lists alone cannot
+reproduce its matching. Not-found is still reported only when the term's category
 was scraped (Woolworths: when its search ran). The `SUMMARY:` line says which
 matcher was used (`app <version>` or `local fallback`) and how many terms were
 found via a fallback key.
 
-`python -m scraper.compare_matchers --site newworld --snapshot data/newworld_snapshots/<date>.json`
+`python -m scraper.compare_matchers --site newworld [--snapshot data/newworld_snapshots/<date>.json] [--examples 15]`
 (env file sourced) compares the app's matcher with the local one on a saved
-snapshot using the store's current terms. It publishes and reports nothing.
+snapshot (default: the store's latest) using the store's current terms. It prints
+how many (term, product) pairs differ, example pairs, and the terms whose found /
+not-found differs. It publishes and reports nothing.
 
 **Pak'nSave and New World never use their site search.** Their robots.txt
 disallows `/shop/search`, so the local backup matcher works on the products the

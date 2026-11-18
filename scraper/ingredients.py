@@ -124,6 +124,7 @@ class StoreLists:
     watch_categories: list[str] = field(default_factory=list)
     watch_category_entries: list[WatchCategory] = field(default_factory=list)
     skip: frozenset[str] = frozenset()
+    match_rules_version: str | None = None  # version of the app's matchRules when the list was fetched
 
     def is_skipped(self, term: str) -> bool:
         return _normalise_term(term) in self.skip
@@ -222,6 +223,8 @@ def fetch_store_lists(
         if not isinstance(watch, dict):
             raise ValueError("watch is not an object")
         watch_entries = _watch_categories(watch.get("categories") or [])
+        rules = data.get("matchRules")
+        rules_version = rules.get("version") if isinstance(rules, dict) else None
         return StoreLists(
             store=store,
             search_terms=_string_list(data.get("search") or [], "search"),
@@ -229,6 +232,7 @@ def fetch_store_lists(
             watch_categories=[entry.name for entry in watch_entries],
             watch_category_entries=watch_entries,
             skip=frozenset(_normalise_term(t) for t in _string_list(data.get("skip") or [], "skip")),
+            match_rules_version=str(rules_version) if isinstance(rules_version, (str, int)) and rules_version != "" else None,
         )
     except urllib.error.HTTPError as e:
         reason = f"status {e.code} ({e.reason})"
