@@ -288,7 +288,7 @@ _PRODUCT = {
 def test_weekly_run_scrapes_mapped_categories_and_summarises_them(monkeypatch, tmp_path, capsys):
     seen = {}
 
-    async def fake_scrape_all(categories, overrides, headed, site, guard, extra_pages=None):
+    async def fake_scrape_all(categories, overrides, headed, site, guard, extra_pages=None, checkpoint=False):
         seen["extra"] = extra_pages
         return {"products": [_PRODUCT], "stats": _STATS, "scraped_categories": {"vegetables": ("carrot",)}}
 

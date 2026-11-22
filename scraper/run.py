@@ -21,6 +21,7 @@ import argparse
 import asyncio
 import os
 import sys
+from dataclasses import asdict
 from datetime import date
 
 from scraper.browser import (
@@ -34,6 +35,7 @@ from scraper.browser import (
     stealth_playwright,
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
+from scraper import checkpoint as checkpoint_module
 from scraper import cooking_wine, page_limits
 from scraper.overrides import get_override, load_overrides
 from scraper.page_limits import PageStat
@@ -128,11 +130,15 @@ async def scrape_all(
     site: str = DEFAULT_SITE,
     guard: RobotsGuard | None = None,
     extra_pages: list[CategoryPage] | None = None,
+    checkpoint: bool = False,
 ) -> dict:
     """Run the full scrape and return a results dict with products and stats.
 
     `extra_pages` are scraped after the categories file's pages (the caller has
     already left out any the file lists) - used for the mapped watch categories.
+
+    `checkpoint` (real runs only) saves progress after every finished category and picks up
+    today's unfinished scrape of the same list, see scraper/checkpoint.py.
 
     `site` selects which chain's store to pin to and which supermarket tag
     to write onto each product (scraper.browser.SITES). Defaults to
@@ -160,6 +166,19 @@ async def scrape_all(
     scraped_categories: dict[str, tuple[str, ...]] = {}  # label -> covers, for categories with a page that loaded
     scraped_at = date.today().isoformat()
     scraped_at_nz = now_nz_iso()
+    done_before = 0
+    pages_loaded = 0
+    wines_set_aside = 0
+    urls = [first.url for first in starts]
+    saved = checkpoint_module.load(site, urls) if checkpoint else None
+    if saved:
+        done_before = saved["done"]
+        products, dropped_reasons = saved["products"], saved["dropped_reasons"]
+        skipped_pages, robots_skipped = saved["skipped_pages"], saved["robots_skipped"]
+        scraped_categories, page_stats = saved["scraped_categories"], saved["page_stats"]
+        scraped_at, scraped_at_nz = saved["scraped_at"], saved["scraped_at_nz"]
+        pages_loaded, wines_set_aside = saved["pages_loaded"], saved["wines_set_aside"]
+        log(f"Carrying on from a saved scrape: {done_before} of {len(starts)} categories already read, {len(products)} items.")
 
     # stealth_playwright() (scraper/browser.py) wraps async_playwright() with
     # playwright-stealth, so every browser/context/page opened below - the
@@ -182,9 +201,9 @@ async def scrape_all(
         page = await context.new_page()
 
         loaded_any = False
-        pages_loaded = 0
-        wines_set_aside = 0
         for number, first in enumerate(starts, 1):
+            if number <= done_before:
+                continue
             path = foodstuffs_path_of(first.url)
             stat = PageStat(
                 label=first.category, path=path, configured=first.max_pages,
@@ -272,6 +291,19 @@ async def scrape_all(
                 kept, set_aside = cooking_wine.select_for_shelf(path, products[shelf_start:], log)
                 products[shelf_start:] = kept
                 wines_set_aside += set_aside
+            if checkpoint:
+                try:
+                    checkpoint_module.save(site, {
+                        "signature": checkpoint_module.signature(urls), "done": number,
+                        "products": products, "dropped_reasons": dropped_reasons,
+                        "skipped_pages": skipped_pages, "robots_skipped": robots_skipped,
+                        "scraped_categories": {k: list(v) for k, v in scraped_categories.items()},
+                        "page_stats": [asdict(s) for s in page_stats],
+                        "scraped_at": scraped_at, "scraped_at_nz": scraped_at_nz,
+                        "pages_loaded": pages_loaded, "wines_set_aside": wines_set_aside,
+                    })
+                except Exception as e:
+                    log(f"  (could not save progress: {type(e).__name__}: {e})")
 
         await browser.close()
 
@@ -356,7 +388,7 @@ async def main_async(args: argparse.Namespace) -> int:
         log("(Dry Run Mode - nothing will be written to disk. Pass --save to write results.)")
 
     try:
-        result = await scrape_all(args.categories, args.overrides, args.headed, args.site)
+        result = await scrape_all(args.categories, args.overrides, args.headed, args.site, checkpoint=args.save)
     except Exception as e:
         # Genuinely unexpected error - stop the run rather than continuing
         # in an unknown state.
@@ -373,6 +405,7 @@ async def main_async(args: argparse.Namespace) -> int:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(products, args.snapshots_dir, today)
         write_scrape_meta(snapshot_path, result["scraped_at"])
+        checkpoint_module.clear(args.site)
         page_limits.save_page_stats(args.site, result["page_stats"], log)
         _, new_entries = update_price_history(products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")

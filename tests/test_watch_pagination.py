@@ -30,9 +30,10 @@ class FakeSite:
         self.loaded: list[str] = []
         self.pauses = 0
         self.broken: set[str] = set()
+        self.crash: set[str] = set()
 
 
-def _scrape(monkeypatch, tmp_path, site: FakeSite, categories: str = "", extra=None, guard=None):
+def _scrape(monkeypatch, tmp_path, site: FakeSite, categories: str = "", extra=None, guard=None, checkpoint=False):
     class FakePage:
         url = ""
 
@@ -59,6 +60,8 @@ def _scrape(monkeypatch, tmp_path, site: FakeSite, categories: str = "", extra=N
         return FakeContext()
 
     async def fake_navigate(page, url, log):
+        if url in site.crash:
+            raise RuntimeError("the Pi lost power")
         if url in site.broken:
             raise PageLoadTimeout("timed out")
         page.url = url
@@ -89,7 +92,9 @@ def _scrape(monkeypatch, tmp_path, site: FakeSite, categories: str = "", extra=N
     overrides = tmp_path / "overrides.txt"
     overrides.write_text("")
     return asyncio.run(
-        run.scrape_all(str(categories_file), str(overrides), False, "paknsave", guard, extra_pages=extra)
+        run.scrape_all(
+            str(categories_file), str(overrides), False, "paknsave", guard, extra_pages=extra, checkpoint=checkpoint
+        )
     )
 
 

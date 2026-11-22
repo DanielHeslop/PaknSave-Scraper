@@ -35,7 +35,7 @@ from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.price_runs import now_nz_iso, post_snapshot_file, publish_run, write_scrape_meta
 from scraper.browser import SITES, parse_categories_file
 from scraper.robots import RobotsGuard
-from scraper import page_limits
+from scraper import checkpoint, page_limits
 from scraper.run import DEFAULT_HISTORY_PATH, DEFAULT_OVERRIDES_PATH, resolve_site_defaults, scrape_all
 from scraper.run import print_summary as print_category_summary
 from scraper.run import print_table as print_category_table
@@ -154,7 +154,8 @@ async def main_async(args: argparse.Namespace) -> int:
     log("=" * 60)
     try:
         category_result = await scrape_all(
-            args.categories, args.overrides, args.headed, args.site, guard, extra_pages=extra_pages
+            args.categories, args.overrides, args.headed, args.site, guard, extra_pages=extra_pages,
+            checkpoint=args.save,
         )
     except Exception as e:
         log(f"UNEXPECTED ERROR during category scrape - stopping run: {e!r}")
@@ -171,6 +172,7 @@ async def main_async(args: argparse.Namespace) -> int:
         today = date.today().isoformat()
         snapshot_path = write_snapshot(dedupe_products(category_products), args.snapshots_dir, today)
         write_scrape_meta(snapshot_path, scraped_at)
+        checkpoint.clear(args.site)
         page_limits.save_page_stats(args.site, category_result.get("page_stats", []), log)
         _, new_entries = update_price_history(category_products, args.history_path)
         log(f"Snapshot written to {snapshot_path}")
