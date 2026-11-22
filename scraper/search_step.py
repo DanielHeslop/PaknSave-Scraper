@@ -241,9 +241,11 @@ def summary_line(
     mapping: dict | None = None,
     run_status: str | None = None,
     paging: dict | None = None,
+    power: str | None = None,
 ) -> str:
     """The one-line run summary. `mapping` (mapped / new / not_found counts) adds the watch-category part;
     `paging` (cut_short / extra_pages counts, see scraper/page_limits.py) adds the page-limit part;
+    `power` (see scraper/power.py) is the start / end power reading in words;
     `run_status` ("run posted (parts 3/3, index complete)" or "run failed (missing parts 2)") is added at the end."""
     minutes, secs = divmod(int(seconds), 60)
     watch = ""
@@ -262,5 +264,6 @@ def summary_line(
         f"found via fallback key {len(outcome.via)}, "
         + (f"app matcher unavailable ({outcome.fallback_reason}), " if outcome.fallback_reason else "")
         + f"run time {minutes}m{secs:02d}s"
+        + (f", {power}" if power else "")
         + (f", {run_status}" if run_status else "")
     )

@@ -38,3 +38,11 @@ def _isolated_category_state(monkeypatch, tmp_path):
         raise RuntimeError("offline in tests")
 
     monkeypatch.setattr(category_tree, "fetch_tree", offline)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_power_reading(monkeypatch):
+    """Tests never read the real Pi's power state; they see a healthy 0x0."""
+    import scraper.power as power
+
+    monkeypatch.setattr(power, "reader", lambda: power.decode_flags(0))

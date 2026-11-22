@@ -39,6 +39,13 @@ set +a
 python3 -m scraper.woolworths --save >>"$LOG_FILE" 2>&1
 EXIT_CODE=$?
 
+# Exit 75 means another scrape (a scheduled run or the after-restart resume) holds
+# the lock, so this one did nothing. See scraper/lock.py.
+if [ "$EXIT_CODE" -eq 75 ]; then
+    echo "RESULT: SKIPPED - another scrape was already running (only one runs at a time)" >>"$LOG_FILE"
+    exit 75
+fi
+
 if [ "$EXIT_CODE" -eq 0 ]; then
     # scraper/woolworths.py prints a "Products saved              : N" line
     # as part of its WOOLWORTHS RUN SUMMARY on every successful run.

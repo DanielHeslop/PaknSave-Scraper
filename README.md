@@ -450,3 +450,23 @@ why.
 trees (no network). `--fix` rewrites a Pak'nSave / New World page that is not in the
 tree only when one path with the same parent and nearly the same name is the clear
 match; anything else is listed and left alone.
+
+## After a power cut
+
+A scrape that is cut off carries on rather than starting again.
+
+- **Progress file.** A real (`--save`) run writes `data/checkpoints/<store>.json` after every
+  category (Pak'nSave, New World) or every shelf and every 20 search terms (Woolworths). A run of
+  the same store on the same day, with the same list, carries on from the last finished step. The
+  file is removed once the snapshot is written. A different day, a changed list, a damaged file or
+  a dry run starts fresh.
+- **One scrape at a time.** Every scrape takes `data/scrape.lock` (released by the system if the
+  process dies). A second one exits with code 75 and the wrapper logs `RESULT: SKIPPED`.
+- **After a restart.** `@reboot` in cron runs `python3 -m scraper.resume_after_boot`
+  (log: `logs/resume.log`). It waits for the clock, does nothing from 22:00, and starts each store
+  at most 3 times a day. It runs the wrapper again if progress was saved, posts the saved snapshot
+  if only the posting was cut, and starts again if nothing was saved. `--dry-run` only says what
+  it would do.
+- **Power.** The start and end of every run log `vcgencmd get_throttled` (or, when that cannot be
+  read, the kernel's own undervoltage sensor and log) and the SUMMARY line says in words whether
+  undervoltage has happened since boot.

@@ -35,7 +35,7 @@ from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
 from scraper.price_runs import now_nz_iso, post_snapshot_file, publish_run, write_scrape_meta
 from scraper.browser import SITES, parse_categories_file
 from scraper.robots import RobotsGuard
-from scraper import checkpoint, page_limits
+from scraper import checkpoint, lock, page_limits, power
 from scraper.run import DEFAULT_HISTORY_PATH, DEFAULT_OVERRIDES_PATH, resolve_site_defaults, scrape_all
 from scraper.run import print_summary as print_category_summary
 from scraper.run import print_table as print_category_table
@@ -126,6 +126,9 @@ def _empty_scrape_result() -> dict:
 async def main_async(args: argparse.Namespace) -> int:
     started = time.monotonic()
     store = args.site
+    power_start = power.log_power("at start", log)
+    if args.save and checkpoint.exists_today(store):
+        log("Found progress saved earlier today by a run that was cut off - carrying on from it.")
     if not args.save:
         log("(Dry Run Mode - nothing is written, published or reported. Pass --save to do it for real.)")
 
@@ -207,6 +210,7 @@ async def main_async(args: argparse.Namespace) -> int:
         log("Dry run - nothing published.")
 
     print(f"Ingredients matched         : {len(outcome.found)}")
+    power_end = power.log_power("at end", log)
     log(
         summary_line(
             published,
@@ -216,6 +220,7 @@ async def main_async(args: argparse.Namespace) -> int:
             mapping.counts() if mapping else None,
             run_status,
             page_limits.cut_short_counts(category_result.get("page_stats", [])),
+            power.summary_part(power_start, power_end),
         )
     )
     return 0
@@ -267,8 +272,7 @@ def main() -> None:
     args = parse_args()
     if args.publish_snapshot:
         sys.exit(publish_snapshot_file(args.publish_snapshot, args.save, args.site, args.legacy_mailbox))
-    exit_code = asyncio.run(main_async(args))
-    sys.exit(exit_code)
+    sys.exit(lock.run_locked(f"{args.site} scrape", lambda: asyncio.run(main_async(args)), log))
 
 
 if __name__ == "__main__":

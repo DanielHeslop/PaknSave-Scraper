@@ -36,7 +36,7 @@ from scraper.browser import (
 )
 from scraper.extract import ExtractResult, extract_product, find_product_tiles, is_valid_product
 from scraper import checkpoint as checkpoint_module
-from scraper import cooking_wine, page_limits
+from scraper import cooking_wine, lock, page_limits, power
 from scraper.overrides import get_override, load_overrides
 from scraper.page_limits import PageStat
 from scraper.price_runs import now_nz_iso, publish_run, write_scrape_meta
@@ -384,6 +384,9 @@ def print_summary(stats: dict) -> None:
 
 
 async def main_async(args: argparse.Namespace) -> int:
+    power_start = power.log_power("at start", log)
+    if args.save and checkpoint_module.exists_today(args.site):
+        log("Found progress saved earlier today by a run that was cut off - carrying on from it.")
     if not args.save:
         log("(Dry Run Mode - nothing will be written to disk. Pass --save to write results.)")
 
@@ -417,15 +420,20 @@ async def main_async(args: argparse.Namespace) -> int:
         run = publish_run(
             products, args.site, result["scraped_at"], legacy=args.legacy_mailbox, snapshot_path=snapshot_path
         )
-        log(f"SUMMARY: {run.summary() or 'nothing posted'}")
+        power_end = power.log_power("at end", log)
+        log(
+            f"SUMMARY: {run.summary() or 'nothing posted'}, "
+            + (power.summary_part(power_start, power_end) or "power not read")
+        )
+    else:
+        power.log_power("at end", log)
 
     return 0
 
 
 def main() -> None:
     args = parse_args()
-    exit_code = asyncio.run(main_async(args))
-    sys.exit(exit_code)
+    sys.exit(lock.run_locked(f"{args.site} scrape", lambda: asyncio.run(main_async(args)), log))
 
 
 if __name__ == "__main__":

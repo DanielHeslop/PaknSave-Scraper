@@ -28,11 +28,11 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 
-from scraper import cooking_wine, page_limits
+from scraper import checkpoint, cooking_wine, lock, page_limits, power
 from scraper.category_mapping import Mapping, MappingResult, covers_for, label_for, sync_and_map
 from scraper.extract import is_valid_product
 from scraper.ingredients import DEFAULT_INGREDIENT_LIST_URL, fetch_store_lists
@@ -181,16 +181,60 @@ def _keep_valid(products: list[dict], dropped: list[str]) -> list[dict]:
     return kept
 
 
-def browse_all(pages: list[BrowsePage]) -> dict:
-    """Step 1: read every browse path. A failing path is logged and skipped."""
+def browse_signature(pages: list[BrowsePage]) -> str:
+    return checkpoint.signature([f"{p.path}|{p.max_pages}" for p in pages])
+
+
+def browse_all(pages: list[BrowsePage], progress: bool = False, scraped_at: str | None = None) -> dict:
+    """Step 1: read every browse path. A failing path is logged and skipped.
+
+    With `progress` (a saving run) the state is written after every shelf, and a same-day
+    run of the same shelf list carries on after the last shelf finished.
+    """
     products: list[dict] = []
     dropped: list[str] = []
     scraped: dict[str, tuple[str, ...]] = {}
     blocked: list[str] = []
     failed = 0
     page_stats: list[page_limits.PageStat] = []
+    first = 0
+    sig = browse_signature(pages)
+    saved = checkpoint.load_section(STORE, "browse", sig) if progress else None
+    if saved is not None:
+        try:
+            first = int(saved["done"])
+            if not 0 < first <= len(pages):
+                raise ValueError("done out of range")
+            products, dropped, blocked = list(saved["products"]), list(saved["dropped"]), list(saved["blocked"])
+            failed = int(saved["failed"])
+            scraped = {k: tuple(v) for k, v in saved["scraped"].items()}
+            page_stats = checkpoint.page_stats_from_records(saved["page_stats"])
+            scraped_at = saved["scraped_at"]
+            log(f"\nResuming the browse step after shelf {first} of {len(pages)} (saved earlier today).")
+        except (KeyError, TypeError, ValueError, AttributeError):
+            first, products, dropped, scraped, blocked, failed, page_stats = 0, [], [], {}, [], 0, []
+
+    def save_progress(done: int) -> None:
+        checkpoint.save_section(
+            STORE,
+            "browse",
+            sig,
+            {
+                "done": done,
+                "products": products,
+                "dropped": dropped,
+                "blocked": blocked,
+                "failed": failed,
+                "scraped": {k: list(v) for k, v in scraped.items()},
+                "page_stats": [asdict(s) for s in page_stats],
+                "scraped_at": scraped_at,
+            },
+        )
+
     remembered = page_limits.load_page_counts(STORE)
     for i, page in enumerate(pages, start=1):
+        if i <= first:
+            continue
         log(f"\n[{i}/{len(pages)}] browsing: {page.path}")
         limit = max(page.max_pages, remembered.get(page.path, 0))
         stat = page_limits.PageStat(label=page.label, path=page.path, configured=page.max_pages, limit=limit)
@@ -199,15 +243,21 @@ def browse_all(pages: list[BrowsePage]) -> dict:
         except RobotsDisallowed as e:
             log(f"  SKIPPED: robots.txt disallows {e}")
             failed += 1
+            if progress:
+                save_progress(i)
             continue
         except BotDetected as e:
             log(f"  BLOCKED: {e}")
             blocked.append(f"{page.path} - {e}")
             failed += 1
+            if progress:
+                save_progress(i)
             continue
         except Exception as e:
             log(f"  FAILED: {type(e).__name__}: {e}")
             failed += 1
+            if progress:
+                save_progress(i)
             continue
         page_stats.append(stat)
         page_limits.log_cut_short([stat], log)
@@ -217,6 +267,8 @@ def browse_all(pages: list[BrowsePage]) -> dict:
         shelf, _ = cooking_wine.select_for_shelf(page.path, shelf, log)
         products.extend(shelf)
         scraped.setdefault(page.label, page.covers)
+        if progress:
+            save_progress(i)
     products = dedupe_products(products)
     counts = page_limits.cut_short_counts(page_stats)
     stats = {
@@ -227,11 +279,24 @@ def browse_all(pages: list[BrowsePage]) -> dict:
         "terms_blocked": blocked,
         "products_dropped": dropped,
     }
-    return {"products": products, "scraped_categories": scraped, "stats": stats, "page_stats": page_stats}
+    return {
+        "products": products,
+        "scraped_categories": scraped,
+        "stats": stats,
+        "page_stats": page_stats,
+        "scraped_at": scraped_at,
+    }
+
+
+SEARCH_SAVE_EVERY = 20  # terms between progress saves
 
 
 def search_all(
-    terms: list[str], size: int, deadline: float | None = None, collected: list[dict] | None = None
+    terms: list[str],
+    size: int,
+    deadline: float | None = None,
+    collected: list[dict] | None = None,
+    progress: bool = False,
 ) -> tuple[SearchOutcome, list[str]]:
     """Step 2: look each term up through the product-search API.
 
@@ -242,10 +307,62 @@ def search_all(
 
     Matching here is the local matcher, per term. `collected`, if given, gets every
     valid product any search returned, so the app's matcher can be run over them all.
+
+    With `progress` (a saving run) the state is written every SEARCH_SAVE_EVERY terms and at
+    the end, and a same-day run of the same term list carries on after the last saved term.
+    The search time already used by the earlier run comes off the time budget (`deadline`).
     """
     outcome = SearchOutcome()
     blocked: list[str] = []
+    first = 0
+    before = 0.0
+    sig = checkpoint.signature(terms)
+    saved = checkpoint.load_section(STORE, "search", sig) if progress else None
+    if saved is not None:
+        try:
+            done = int(saved["done"])
+            if not 0 < done <= len(terms):
+                raise ValueError("done out of range")
+            restored = SearchOutcome(
+                searched=list(saved["searched"]),
+                found={k: list(v) for k, v in saved["found"].items()},
+                not_found=list(saved["not_found"]),
+                unreported=list(saved["unreported"]),
+            )
+            restored_blocked, restored_collected, before = list(saved["blocked"]), list(saved["collected"]), float(saved["spent"])
+        except (KeyError, TypeError, ValueError, AttributeError):
+            pass
+        else:
+            first, outcome, blocked = done, restored, restored_blocked
+            if collected is not None:
+                collected.extend(restored_collected)
+            if deadline is not None:
+                deadline -= before
+            log(f"Resuming the search step after term {first} of {len(terms)} (saved earlier today).")
+    began = time.monotonic()
+
+    def save_progress(done: int) -> None:
+        checkpoint.save_section(
+            STORE,
+            "search",
+            sig,
+            {
+                "done": done,
+                "searched": outcome.searched,
+                "found": outcome.found,
+                "not_found": outcome.not_found,
+                "unreported": outcome.unreported,
+                "blocked": blocked,
+                "collected": dedupe_products(collected) if collected else [],
+                "spent": before + time.monotonic() - began,
+            },
+        )
+
     for index, term in enumerate(terms):
+        if index < first:
+            continue
+        if index > first and progress and (index - first) % SEARCH_SAVE_EVERY == 0:
+            save_progress(index)
         if deadline is not None and time.monotonic() > deadline:
             outcome.unsearched = terms[index:]
             log(f"Search step ran out of time - {len(outcome.unsearched)} term(s) not searched.")
@@ -276,6 +393,8 @@ def search_all(
             outcome.found[term] = matches
         else:
             outcome.not_found.append(term)
+    if progress and not blocked:
+        save_progress(len(terms) - len(outcome.unsearched))
     return outcome, blocked
 
 
@@ -324,7 +443,7 @@ def run_search_step(
         )
     log(f"{len(terms)} term(s) to search.")
     collected: list[dict] = []
-    outcome, blocked = search_all(terms, args.size, deadline, collected)
+    outcome, blocked = search_all(terms, args.size, deadline, collected, progress=args.save)
     outcome.skipped = skipped
     outcome = apply_app_matcher(
         outcome, list(browse_products_list or []) + collected, lists.match_rules_version if lists else None
@@ -393,8 +512,15 @@ def _enrich_sheets(products: list[dict], save: bool) -> None:
 
 
 def main() -> int:
+    return lock.run_locked("woolworths scrape", run, log)
+
+
+def run() -> int:
     started = time.monotonic()
     args = parse_args()
+    power_start = power.log_power("at start", log)
+    if args.save and checkpoint.exists_today(STORE):
+        log("Found progress saved earlier today by a run that was cut off - carrying on from it.")
     if not args.save:
         log("(Dry Run Mode - nothing is written, published or reported. Pass --save to do it for real.)")
 
@@ -419,10 +545,11 @@ def main() -> int:
     log("\nSTEP 1: BROWSE (watch categories)")
     scraped_at = now_nz_iso()
     try:
-        browse = browse_all(pages)
+        browse = browse_all(pages, progress=args.save, scraped_at=scraped_at)
     except Exception as e:
         log(f"UNEXPECTED ERROR - stopping run: {e!r}")
         return 1
+    scraped_at = browse.get("scraped_at") or scraped_at
     browse_products_list = browse["products"]
     stats = browse["stats"]
 
@@ -458,13 +585,17 @@ def main() -> int:
     run_status = None
     if args.save:
         extra = [p for p in outcome.matched_products if p not in browse_products_list]
+        snapshot_final = True
         if extra:
             try:
                 today = date.today().isoformat()
                 write_scrape_meta(write_snapshot(to_publish, args.snapshots_dir, today), scraped_at)
                 update_price_history(extra, args.history_path)
             except Exception as e:
+                snapshot_final = False
                 log(f"Could not update snapshot/history with search results ({type(e).__name__}: {e}).")
+        if snapshot_final:
+            checkpoint.clear(STORE)
         try:
             snapshot = Path(args.snapshots_dir) / f"{date.today().isoformat()}.json"
             run = publish_run(
@@ -482,6 +613,7 @@ def main() -> int:
         log("Dry run - nothing published.")
 
     print(f"Ingredients matched         : {len(outcome.found)}")
+    power_end = power.log_power("at end", log)
     log(
         summary_line(
             published,
@@ -491,6 +623,7 @@ def main() -> int:
             mapping.counts() if mapping else None,
             run_status,
             {"cut_short": stats.get("categories_cut_short", 0), "extra_pages": stats.get("extra_pages_read", 0)},
+            power.summary_part(power_start, power_end),
         )
     )
     return 0
