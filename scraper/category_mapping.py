@@ -328,7 +328,11 @@ def woolworths_file_paths(categories_file: str | Path) -> list[str]:
         lines = Path(categories_file).read_text().splitlines()
     except OSError:
         return []
-    return [clean_path(line.split()[0]) for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    return [
+        clean_path(line.split()[0])
+        for line in lines
+        if line.strip() and not line.lstrip().startswith(("#", "@"))
+    ]
 
 
 def check_categories_file(categories_file: str | Path, categories: list[Category], store: str = "paknsave") -> CategoriesFileCheck:
@@ -402,18 +406,21 @@ def extra_foodstuffs_pages(store: str, mapped: list[Mapping], existing: list[Cat
     return pages
 
 
-def sync_and_map(store: str, lists, *, save: bool, guard=None, sync=None) -> MappingResult | None:
+def sync_and_map(store: str, lists, *, save: bool, guard=None, sync=None, tree_out: list | None = None) -> MappingResult | None:
     """Sync the store's category tree (post if changed), then map its watch categories.
 
     `lists` is the app's StoreLists for this store (None if the app couldn't be
     reached). Returns None when there are no lists to map. Never raises - a
-    failure here must not stop the scrape.
+    failure here must not stop the scrape. `tree_out`, when given, is filled with the
+    synced tree's categories (also when there are no lists to map).
     """
     try:
         synced = (sync or category_tree.sync_tree)(store, save=save, guard=guard)
     except Exception as e:
         log(f"Category tree ({store}) failed ({type(e).__name__}: {e}) - carrying on without it.")
         return None
+    if tree_out is not None:
+        tree_out[:] = synced.categories
     if lists is None:
         log(f"Watch categories at {store}: the app's list is not available - nothing mapped.")
         return None

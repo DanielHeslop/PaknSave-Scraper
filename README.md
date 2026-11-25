@@ -272,10 +272,26 @@ any shared word, so a generic word on a category (e.g. `cream`) can match
 unrelated products.
 
 **Woolworths** uses its public JSON API: the browse API for the watch categories
-in `woolworths_categories.txt`, and the product-search API for each term (with a
-short delay between requests). robots.txt disallows only `/shop/search` (the HTML
+and the main grocery shelves in `woolworths_categories.txt`, and the product-search
+API for each term (with a short delay between requests). robots.txt disallows only `/shop/search` (the HTML
 page), not `/api/v1/products`. A term is not found when the search ran and nothing
 sensible came back.
+
+**Woolworths main shelves.** Like Pak'nSave and New World (about 65 whole
+categories each), Woolworths reads its main grocery shelves in full, whatever search
+terms the app sends. `woolworths_categories.txt` has `@aisles <department>
+<aisle,aisle,...|*>` rules (fruit-veg, meat-poultry, fish-seafood, fridge-deli,
+bakery, pantry, frozen, plus the household and health-body aisles of the watch
+categories). Each run resolves them against the category tree it has just posted to
+the app (`scraper/woolworths_shelves.py`): an aisle the tree no longer has is logged
+and skipped, promotional aisles (`3-for-20`, `fresh-deals`, `in-season`, ...) are
+never read, and a listed shelf inside an aisle is folded into it (its `covers`
+stay). Beer & wine is only the cask and cheapest white and red lines. Every item
+carries its shelf path as its category. The app's search terms are still searched
+and de-duplicated with the shelves by product id. Paging, the page-limit read-on, the
+2 to 3 second delays, the robots.txt check and the per-shelf checkpoints are the
+same as before. `python -m scraper.woolworths_shelves` prints the shelf list with
+expected pages and items and the browse time, from the cached tree, with no request.
 
 Stock (liquid stock, cubes, powder) comes from the `pantry/herbs-spices-stock/stock`
 shelf, which is in `woolworths_categories.txt` as `category=stock`. Stock names put the
@@ -449,7 +465,8 @@ why.
 `newworld_categories.txt` and `woolworths_categories.txt` with the cached category
 trees (no network). `--fix` rewrites a Pak'nSave / New World page that is not in the
 tree only when one path with the same parent and nearly the same name is the clear
-match; anything else is listed and left alone.
+match; anything else is listed and left alone. The `@aisles` rules of the Woolworths file
+are checked at run time, not here (see `python -m scraper.woolworths_shelves`).
 
 ## After a power cut
 

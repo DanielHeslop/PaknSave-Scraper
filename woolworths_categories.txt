@@ -27,3 +27,24 @@ fish-seafood/fish category=fish covers=fish,salmon,snapper,hoki,cod,tuna
 beer-wine/cask-wine category=cask-wine
 beer-wine/white-wine category=white-wine
 beer-wine/red-wine category=red-wine
+
+# --- Main grocery shelves, read in full (like Pak'nSave and New World) ---
+# `@aisles <department> <aisle,aisle,...|*> [pages=N]` reads each named second-level shelf (aisle) whole,
+# with every shelf below it. The paths are looked up in the category tree the run posts to the app, so a
+# renamed or removed aisle is logged and skipped, not an error. Promotional aisles (3-for-20, fresh-deals,
+# in-season, ...) are never read. pages= is a soft limit: a full last page is read on (up to 20 pages).
+# Lines above that name a shelf below one of these aisles are folded into the aisle; their covers= stay.
+# `python -m scraper.woolworths_shelves` lists the shelves, expected pages and items without any request.
+#
+# Beer & wine is left to the cask / cheapest white and red lines above.
+@aisles fruit-veg fruit,vegetables,fresh-salad-herbs,prepared-fruit-veg
+@aisles meat-poultry *
+@aisles fish-seafood *
+@aisles fridge-deli cheese,cream-custard,eggs-butter-spreads,milk,yoghurt-desserts,deli-meats-seafood,dips-hummus-nibbles,pasta-pizza-pastry
+@aisles bakery *
+@aisles pantry *
+@aisles frozen frozen-vegetables,frozen-meat,frozen-seafood,frozen-fruit-drink,pizza-pastry-bread
+# Household and health-body: the shelves the watch categories point at (cleaning, laundry, kitchen,
+# bathroom incl. toilet paper, dental, hair care, bath/shower/soap).
+@aisles household cleaning,laundry,kitchen,bathroom
+@aisles health-body dental-oral-care,hair-care,bath-shower-soap

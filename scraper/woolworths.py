@@ -43,6 +43,7 @@ from scraper.search_step import (
     SEARCH_TIME_BUDGET_SECONDS,
     SearchOutcome,
     dedupe_products,
+    product_key,
     log_outcome,
     outcome_from_app,
     plan_terms,
@@ -51,6 +52,7 @@ from scraper.search_step import (
     try_app_match,
 )
 from scraper.storage import update_price_history, write_snapshot
+from scraper import woolworths_shelves
 from scraper.woolworths_sheets import enrich_sheet_counts
 from scraper.woolworths_transport import (
     BotDetected,
@@ -137,7 +139,7 @@ def parse_categories_file(path: str | Path) -> list[BrowsePage]:
     pages: list[BrowsePage] = []
     for raw_line in path.read_text().splitlines():
         line = raw_line.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith("#") or line.startswith(woolworths_shelves.RULE_PREFIX):
             continue
         parts = line.split()
         browse_path = parts[0].strip("/")
@@ -168,6 +170,46 @@ def extra_browse_pages(mapped: list[Mapping], existing: list[BrowsePage]) -> lis
         have.add(m.path)
         pages.append(BrowsePage(m.path, label_for(m), covers_for(m), DEFAULT_BROWSE_MAX_PAGES))
     return pages
+
+
+def planned_pages(
+    categories_path: str | Path, tree_paths, pages: list[BrowsePage], log=log
+) -> tuple[list[BrowsePage], list[str]]:
+    """`pages` plus the aisles named by the `@aisles` rules that the tree has, and the log lines for it.
+
+    A page that lies inside one of the aisles (or repeats a path) is folded into the aisle read whole,
+    which keeps its `covers`.
+    """
+    tree_paths = list(tree_paths)
+    rules = woolworths_shelves.parse_rules(categories_path)
+    notes: list[str] = []
+    if not rules:
+        return pages, notes
+    if not tree_paths:
+        notes.append("Woolworths shelves: no category tree (fetched or cached) - the aisle rules were not applied.")
+        return pages, notes
+    plan = woolworths_shelves.plan_shelves(rules, tree_paths, taken_labels={p.label for p in pages})
+    combined = pages + [BrowsePage(s.path, s.label, (), s.max_pages) for s in plan.shelves]
+    keep, folded = woolworths_shelves.drop_covered([p.path for p in combined])
+    by_path: dict[str, BrowsePage] = {}
+    for page in combined:
+        by_path.setdefault(page.path, page)
+    for path, wider in folded:
+        if wider == path:
+            continue
+        target = by_path[wider]
+        merged = tuple(dict.fromkeys(target.covers + by_path[path].covers))
+        by_path[wider] = BrowsePage(target.path, target.label, merged, target.max_pages)
+    final = [by_path[combined[i].path] for i in keep]
+    notes.append(
+        f"Woolworths shelves: {len(plan.shelves)} aisle(s) from the category tree, "
+        f"{len(folded)} listed shelf(ves) folded into them, {len(final)} browse pages in all."
+    )
+    if plan.promotional_skipped:
+        notes.append(f"  promotional aisle(s) left out: {', '.join(plan.promotional_skipped)}")
+    if plan.missing:
+        notes.append(f"  named in the rules but not in the tree (skipped): {', '.join(plan.missing)}")
+    return final, notes
 
 
 def _keep_valid(products: list[dict], dropped: list[str]) -> list[dict]:
@@ -532,15 +574,22 @@ def run() -> int:
         log(f"Could not fetch the app's list up front ({type(e).__name__}) - the search step will try again.")
     mapping: MappingResult | None = None
     pages = []
+    tree: list = []
     try:
         pages = parse_categories_file(args.categories)
-        mapping = sync_and_map(STORE, None if lists is _FETCH_LATER else lists, save=args.save)
+        mapping = sync_and_map(STORE, None if lists is _FETCH_LATER else lists, save=args.save, tree_out=tree)
         if mapping:
             extra = extra_browse_pages(mapping.mapped, pages)
             log(f"{len(extra)} mapped watch categor(ies) to browse beyond the categories file.")
             pages = pages + extra
     except Exception as e:
         log(f"Watch category step failed ({type(e).__name__}: {e}) - carrying on without it.")
+    try:
+        pages, notes = planned_pages(args.categories, [c.path for c in tree], pages)
+        for note in notes:
+            log(note)
+    except Exception as e:
+        log(f"Main shelves could not be planned ({type(e).__name__}: {e}) - browsing the listed shelves only.")
 
     log("\nSTEP 1: BROWSE (watch categories)")
     scraped_at = now_nz_iso()
@@ -572,7 +621,9 @@ def run() -> int:
     except Exception as e:
         log(f"Search step failed ({type(e).__name__}: {e}) - carrying on to publish.")
 
-    _enrich_sheets([p for p in outcome.matched_products if p not in browse_products_list], args.save)
+    browse_ids = {product_key(p) for p in browse_products_list}
+    search_only = [p for p in outcome.matched_products if product_key(p) not in browse_ids]
+    _enrich_sheets(search_only, args.save)
     to_publish = dedupe_products(browse_products_list + outcome.matched_products)
     stats["products_saved"] = len(to_publish)
     stats["products_with_unit_price"] = sum(1 for p in to_publish if p["unit_price"] is not None)
@@ -584,13 +635,14 @@ def run() -> int:
     published = 0
     run_status = None
     if args.save:
-        extra = [p for p in outcome.matched_products if p not in browse_products_list]
+        extra = search_only
         snapshot_final = True
-        if extra:
+        if extra or to_publish != browse_products_list:
             try:
                 today = date.today().isoformat()
                 write_scrape_meta(write_snapshot(to_publish, args.snapshots_dir, today), scraped_at)
-                update_price_history(extra, args.history_path)
+                if extra:
+                    update_price_history(extra, args.history_path)
             except Exception as e:
                 snapshot_final = False
                 log(f"Could not update snapshot/history with search results ({type(e).__name__}: {e}).")

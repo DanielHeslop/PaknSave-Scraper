@@ -1,0 +1,1521 @@
+{
+"store": "woolworths",
+"note": "Slice of the real Woolworths category tree (data/category_trees/woolworths.json, 2026-11-24): all departments and aisles, shelves only under a few aisles.",
+"categories": [
+{
+"path": "baby-child",
+"name": "Baby & Child",
+"parent": ""
+},
+{
+"path": "baby-child/baby-food",
+"name": "Baby Food",
+"parent": "baby-child"
+},
+{
+"path": "baby-child/bottles-toys-accessories",
+"name": "Bottles, Toys & Accessories",
+"parent": "baby-child"
+},
+{
+"path": "baby-child/for-mum",
+"name": "For Mum",
+"parent": "baby-child"
+},
+{
+"path": "baby-child/formula",
+"name": "Formula",
+"parent": "baby-child"
+},
+{
+"path": "baby-child/nappies-wipes",
+"name": "Nappies & Wipes",
+"parent": "baby-child"
+},
+{
+"path": "bakery",
+"name": "Bakery",
+"parent": ""
+},
+{
+"path": "bakery/bagels-crumpets-pancakes",
+"name": "Bagels, Crumpets & Pancakes",
+"parent": "bakery"
+},
+{
+"path": "bakery/bakery-in-store",
+"name": "Bakery In Store",
+"parent": "bakery"
+},
+{
+"path": "bakery/buns-rolls-bread-sticks",
+"name": "Buns, Rolls & Bread Sticks",
+"parent": "bakery"
+},
+{
+"path": "bakery/cakes-muffins-desserts",
+"name": "Cakes, Muffins & Desserts",
+"parent": "bakery"
+},
+{
+"path": "bakery/gluten-free",
+"name": "Gluten Free",
+"parent": "bakery"
+},
+{
+"path": "bakery/low-carb-keto",
+"name": "Low Carb & Keto",
+"parent": "bakery"
+},
+{
+"path": "bakery/pastries-croissants-biscuits",
+"name": "Pastries, Croissants & Biscuits",
+"parent": "bakery"
+},
+{
+"path": "bakery/sliced-packaged-bread",
+"name": "Sliced & Packaged Bread",
+"parent": "bakery"
+},
+{
+"path": "bakery/wraps-pita-pizza-bases",
+"name": "Wraps, Pita & Pizza Bases",
+"parent": "bakery"
+},
+{
+"path": "beer-wine",
+"name": "Beer & Wine",
+"parent": ""
+},
+{
+"path": "beer-wine/beer",
+"name": "Beer",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/cask-wine",
+"name": "Cask Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/champagne-sparkling-wine",
+"name": "Champagne & Sparkling Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/cider",
+"name": "Cider",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/craft-beer",
+"name": "Craft Beer",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/lower-alcohol",
+"name": "Lower Alcohol",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/mini-wine-bottles-cans",
+"name": "Mini Wine Bottles & Cans",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/moscato-sweet-wine",
+"name": "Moscato & Sweet Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/non-alcoholic",
+"name": "Non Alcoholic",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/organic-wine",
+"name": "Organic Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/red-wine",
+"name": "Red Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/rose-wine",
+"name": "Rose Wine",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/seltzer-alcoholic-kombucha",
+"name": "Seltzer & Alcoholic Kombucha",
+"parent": "beer-wine"
+},
+{
+"path": "beer-wine/white-wine",
+"name": "White Wine",
+"parent": "beer-wine"
+},
+{
+"path": "dinner",
+"name": "Dinner",
+"parent": ""
+},
+{
+"path": "dinner/desserts",
+"name": "Desserts",
+"parent": "dinner"
+},
+{
+"path": "dinner/heat-eat",
+"name": "Heat & Eat",
+"parent": "dinner"
+},
+{
+"path": "dinner/ready-meals",
+"name": "Ready Meals",
+"parent": "dinner"
+},
+{
+"path": "dinner/sides-salads",
+"name": "Sides & Salads",
+"parent": "dinner"
+},
+{
+"path": "drinks",
+"name": "Drinks",
+"parent": ""
+},
+{
+"path": "drinks/chilled-juice-drinks",
+"name": "Chilled Juice & Drinks",
+"parent": "drinks"
+},
+{
+"path": "drinks/coffee",
+"name": "Coffee",
+"parent": "drinks"
+},
+{
+"path": "drinks/juice-cordial",
+"name": "Juice & Cordial",
+"parent": "drinks"
+},
+{
+"path": "drinks/soft-drinks",
+"name": "Soft Drinks",
+"parent": "drinks"
+},
+{
+"path": "drinks/sports-energy-drinks",
+"name": "Sports & Energy Drinks",
+"parent": "drinks"
+},
+{
+"path": "drinks/tea-milk-drinks",
+"name": "Tea & Milk Drinks",
+"parent": "drinks"
+},
+{
+"path": "drinks/water",
+"name": "Water",
+"parent": "drinks"
+},
+{
+"path": "fish-seafood",
+"name": "Fish & Seafood",
+"parent": ""
+},
+{
+"path": "fish-seafood/3-for-20",
+"name": "3 for $20",
+"parent": "fish-seafood"
+},
+{
+"path": "fish-seafood/fish",
+"name": "Fish",
+"parent": "fish-seafood"
+},
+{
+"path": "fish-seafood/prawns-seafood",
+"name": "Prawns & Seafood",
+"parent": "fish-seafood"
+},
+{
+"path": "fish-seafood/salmon",
+"name": "Salmon",
+"parent": "fish-seafood"
+},
+{
+"path": "fridge-deli",
+"name": "Fridge & Deli",
+"parent": ""
+},
+{
+"path": "fridge-deli/3-for-12-deli",
+"name": "3 for $12 Deli",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/3-for-12-deli/3-for-12",
+"name": "3 for $12",
+"parent": "fridge-deli/3-for-12-deli"
+},
+{
+"path": "fridge-deli/cheese",
+"name": "Cheese",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/cheese/award-winning-cheese",
+"name": "Award Winning Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/block-cheese",
+"name": "Block Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/blue-brie-specialty-cheese",
+"name": "Blue, Brie & Specialty Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/blue-cheese",
+"name": "Blue Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/brie-camembert-cheese",
+"name": "Brie & Camembert Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/cheese-slices",
+"name": "Cheese Slices",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/cheeseboards-platters",
+"name": "Cheeseboards & Platters",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/cream-cheese-cottage-cheese",
+"name": "Cream Cheese & Cottage Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/feta-goats-cheese",
+"name": "Feta & Goats Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/grated-cheese",
+"name": "Grated Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/haloumi-cooking-cheese",
+"name": "Haloumi & Cooking Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/lunchbox-snacking-cheese",
+"name": "Lunchbox & Snacking Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/mozzarella-bocconcini-cheese",
+"name": "Mozzarella & Bocconcini Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/parmesan-italian-cheese",
+"name": "Parmesan & Italian Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/sliced-grated-cheese",
+"name": "Sliced & Grated Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cheese/vegan-dairy-free-cheese",
+"name": "Vegan & Dairy Free Cheese",
+"parent": "fridge-deli/cheese"
+},
+{
+"path": "fridge-deli/cream-custard",
+"name": "Cream & Custard",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/cream-custard/cream",
+"name": "Cream",
+"parent": "fridge-deli/cream-custard"
+},
+{
+"path": "fridge-deli/cream-custard/creme-fraiche-sour-cream",
+"name": "Creme Fraiche & Sour Cream",
+"parent": "fridge-deli/cream-custard"
+},
+{
+"path": "fridge-deli/cream-custard/custard",
+"name": "Custard",
+"parent": "fridge-deli/cream-custard"
+},
+{
+"path": "fridge-deli/deli-meats-seafood",
+"name": "Deli Meats & Seafood",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/bacon",
+"name": "Bacon",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/cooked-meats",
+"name": "Cooked Meats",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/ham-shaved-meat",
+"name": "Ham & Shaved Meat",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/prawns-mussels",
+"name": "Prawns & Mussels",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/salami-cured-dried-meats",
+"name": "Salami, Cured & Dried Meats",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-meats-seafood/smoked-salmon-fish-shellfish",
+"name": "Smoked Salmon, Fish & Shellfish",
+"parent": "fridge-deli/deli-meats-seafood"
+},
+{
+"path": "fridge-deli/deli-salads",
+"name": "Deli Salads",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/deli-salads/green-salads",
+"name": "Green Salads",
+"parent": "fridge-deli/deli-salads"
+},
+{
+"path": "fridge-deli/deli-salads/pasta-rice-salad",
+"name": "Pasta & Rice Salad",
+"parent": "fridge-deli/deli-salads"
+},
+{
+"path": "fridge-deli/deli-salads/seafood-salad",
+"name": "Seafood Salad",
+"parent": "fridge-deli/deli-salads"
+},
+{
+"path": "fridge-deli/deli-salads/slaws",
+"name": "Slaws",
+"parent": "fridge-deli/deli-salads"
+},
+{
+"path": "fridge-deli/deli-salads/vegetable-salads",
+"name": "Vegetable Salads",
+"parent": "fridge-deli/deli-salads"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles",
+"name": "Dips, Hummus & Nibbles",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/dips",
+"name": "Dips",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/fruit-paste",
+"name": "Fruit Paste",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/hummus",
+"name": "Hummus",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/mixed-antipasto",
+"name": "Mixed Antipasto",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/olives",
+"name": "Olives",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/pate",
+"name": "Pate",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/dips-hummus-nibbles/sundried-tomatoes",
+"name": "Sundried Tomatoes",
+"parent": "fridge-deli/dips-hummus-nibbles"
+},
+{
+"path": "fridge-deli/eggs-butter-spreads",
+"name": "Eggs, Butter & Spreads",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/eggs-butter-spreads/barn-eggs",
+"name": "Barn Eggs",
+"parent": "fridge-deli/eggs-butter-spreads"
+},
+{
+"path": "fridge-deli/eggs-butter-spreads/butter",
+"name": "Butter",
+"parent": "fridge-deli/eggs-butter-spreads"
+},
+{
+"path": "fridge-deli/eggs-butter-spreads/free-range-eggs",
+"name": "Free Range Eggs",
+"parent": "fridge-deli/eggs-butter-spreads"
+},
+{
+"path": "fridge-deli/eggs-butter-spreads/margarine-spreads",
+"name": "Margarine & Spreads",
+"parent": "fridge-deli/eggs-butter-spreads"
+},
+{
+"path": "fridge-deli/juice-drinks",
+"name": "Juice & Drinks",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/juice-drinks/fruit-juices",
+"name": "Fruit Juices",
+"parent": "fridge-deli/juice-drinks"
+},
+{
+"path": "fridge-deli/juice-drinks/iced-tea-coffee",
+"name": "Iced Tea & Coffee",
+"parent": "fridge-deli/juice-drinks"
+},
+{
+"path": "fridge-deli/juice-drinks/kombucha-speciality-drinks",
+"name": "Kombucha & Speciality Drinks",
+"parent": "fridge-deli/juice-drinks"
+},
+{
+"path": "fridge-deli/juice-drinks/smoothies",
+"name": "Smoothies",
+"parent": "fridge-deli/juice-drinks"
+},
+{
+"path": "fridge-deli/juice-drinks/vegetable-mixed-juices",
+"name": "Vegetable & Mixed Juices",
+"parent": "fridge-deli/juice-drinks"
+},
+{
+"path": "fridge-deli/milk",
+"name": "Milk",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/milk/dairy-lactose-free-milk",
+"name": "Dairy & Lactose Free Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/enriched-milk",
+"name": "Enriched Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/flavoured-milk-iced-coffee",
+"name": "Flavoured Milk & Iced Coffee",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/full-cream-milk",
+"name": "Full Cream Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/long-life-milk",
+"name": "Long Life Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/organic-milk",
+"name": "Organic Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/milk/trim-light-milk",
+"name": "Trim & Light Milk",
+"parent": "fridge-deli/milk"
+},
+{
+"path": "fridge-deli/pasta-pizza-pastry",
+"name": "Pasta, Pizza & Pastry",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/pasta-pizza-pastry/pasta-sauce",
+"name": "Pasta & Sauce",
+"parent": "fridge-deli/pasta-pizza-pastry"
+},
+{
+"path": "fridge-deli/pasta-pizza-pastry/pastry",
+"name": "Pastry",
+"parent": "fridge-deli/pasta-pizza-pastry"
+},
+{
+"path": "fridge-deli/pasta-pizza-pastry/pizza-bases",
+"name": "Pizza & Bases",
+"parent": "fridge-deli/pasta-pizza-pastry"
+},
+{
+"path": "fridge-deli/prepared-meals-sides",
+"name": "Prepared Meals & Sides",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/3-dinners-for-20",
+"name": "3 Dinners for $20",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/chilled-soup-risotto",
+"name": "Chilled Soup & Risotto",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/garlic-other-bread",
+"name": "Garlic & Other Bread",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/heat-and-eat-meals",
+"name": "Heat-And-Eat Meals",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/pies-quiche",
+"name": "Pies & Quiche",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/platters",
+"name": "Platters",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/prepared-meals-sides/sandwiches-snacks",
+"name": "Sandwiches & Snacks",
+"parent": "fridge-deli/prepared-meals-sides"
+},
+{
+"path": "fridge-deli/vegan-vegetarian",
+"name": "Vegan & Vegetarian",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/vegan-vegetarian/condiments",
+"name": "Condiments",
+"parent": "fridge-deli/vegan-vegetarian"
+},
+{
+"path": "fridge-deli/vegan-vegetarian/falafel",
+"name": "Falafel",
+"parent": "fridge-deli/vegan-vegetarian"
+},
+{
+"path": "fridge-deli/vegan-vegetarian/sausages-burgers",
+"name": "Sausages & Burgers",
+"parent": "fridge-deli/vegan-vegetarian"
+},
+{
+"path": "fridge-deli/vegan-vegetarian/tofu",
+"name": "Tofu",
+"parent": "fridge-deli/vegan-vegetarian"
+},
+{
+"path": "fridge-deli/yoghurt-desserts",
+"name": "Yoghurt & Desserts",
+"parent": "fridge-deli"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/dairy-free-yoghurt",
+"name": "Dairy Free Yoghurt",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/desserts",
+"name": "Desserts",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/greek-greek-style",
+"name": "Greek & Greek Style",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/large-tub-yoghurt",
+"name": "Large Tub Yoghurt",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/multipacks-pouches-single-serve",
+"name": "Multipacks, Pouches & Single Serve",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "fridge-deli/yoghurt-desserts/natural-health",
+"name": "Natural & Health",
+"parent": "fridge-deli/yoghurt-desserts"
+},
+{
+"path": "frozen",
+"name": "Frozen",
+"parent": ""
+},
+{
+"path": "frozen/frozen-desserts",
+"name": "Frozen Desserts",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-fruit-drink",
+"name": "Frozen Fruit & Drink",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-meals-snacks",
+"name": "Frozen Meals & Snacks",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-meat",
+"name": "Frozen Meat",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-meat-alternatives",
+"name": "Frozen Meat Alternatives",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-seafood",
+"name": "Frozen Seafood",
+"parent": "frozen"
+},
+{
+"path": "frozen/frozen-vegetables",
+"name": "Frozen Vegetables",
+"parent": "frozen"
+},
+{
+"path": "frozen/ice",
+"name": "Ice",
+"parent": "frozen"
+},
+{
+"path": "frozen/ice-cream-sorbet",
+"name": "Ice Cream & Sorbet",
+"parent": "frozen"
+},
+{
+"path": "frozen/pizza-pastry-bread",
+"name": "Pizza, Pastry & Bread",
+"parent": "frozen"
+},
+{
+"path": "fruit-veg",
+"name": "Fruit & Veg",
+"parent": ""
+},
+{
+"path": "fruit-veg/floral",
+"name": "Floral",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/floral/flowers",
+"name": "Flowers",
+"parent": "fruit-veg/floral"
+},
+{
+"path": "fruit-veg/fresh-deals",
+"name": "Fresh Deals",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/fresh-deals/fresh-deals-fruit",
+"name": "Fresh Deals Fruit",
+"parent": "fruit-veg/fresh-deals"
+},
+{
+"path": "fruit-veg/fresh-deals/fresh-deals-vegetables",
+"name": "Fresh Deals Vegetables",
+"parent": "fruit-veg/fresh-deals"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs",
+"name": "Fresh Salad & Herbs",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/avocados",
+"name": "Avocados",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/capsicum",
+"name": "Capsicum",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/carrots-root-vegetables",
+"name": "Carrots & Root Vegetables",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/chilli-garlic-ginger",
+"name": "Chilli, Garlic & Ginger",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/cucumber",
+"name": "Cucumber",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/fresh-herbs",
+"name": "Fresh Herbs",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/lettuce-salad-greens",
+"name": "Lettuce & Salad Greens",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/onions",
+"name": "Onions",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/salad-toppers",
+"name": "Salad Toppers",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/slaws-salad-kits",
+"name": "Slaws & Salad Kits",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/sprouts-microgreens",
+"name": "Sprouts & Microgreens",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fresh-salad-herbs/tomatoes",
+"name": "Tomatoes",
+"parent": "fruit-veg/fresh-salad-herbs"
+},
+{
+"path": "fruit-veg/fruit",
+"name": "Fruit",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/fruit/apples",
+"name": "Apples",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/avocados",
+"name": "Avocados",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/bananas",
+"name": "Bananas",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/berries-dipping-sauces",
+"name": "Berries & Dipping Sauces",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/citrus-fruit",
+"name": "Citrus Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/feijoa-kiwifruit",
+"name": "Feijoa & Kiwifruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/fruit-salads-cut-fruit",
+"name": "Fruit Salads & Cut Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/grapes",
+"name": "Grapes",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/in-season-fruit",
+"name": "In Season Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/organic-fruit",
+"name": "Organic Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/peaches-plums-stone-fruit",
+"name": "Peaches, Plums & Stone Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/pears",
+"name": "Pears",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/pineapple-mango-melons",
+"name": "Pineapple, Mango & Melons",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/the-odd-bunch",
+"name": "The Odd Bunch",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/fruit/tropical-exotic-fruit",
+"name": "Tropical & Exotic Fruit",
+"parent": "fruit-veg/fruit"
+},
+{
+"path": "fruit-veg/in-season",
+"name": "In Season",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/in-season/in-season-floral",
+"name": "In Season Floral",
+"parent": "fruit-veg/in-season"
+},
+{
+"path": "fruit-veg/in-season/in-season-fruit",
+"name": "In Season Fruit",
+"parent": "fruit-veg/in-season"
+},
+{
+"path": "fruit-veg/in-season/in-season-vegetables",
+"name": "In Season Vegetables",
+"parent": "fruit-veg/in-season"
+},
+{
+"path": "fruit-veg/organic",
+"name": "Organic",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/organic/organic-fruit",
+"name": "Organic Fruit",
+"parent": "fruit-veg/organic"
+},
+{
+"path": "fruit-veg/organic/organic-vegetables",
+"name": "Organic Vegetables",
+"parent": "fruit-veg/organic"
+},
+{
+"path": "fruit-veg/prepared-fruit-veg",
+"name": "Prepared Fruit & Veg",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/prepared-fruit-veg/cut-fruit-fruit-salads",
+"name": "Cut Fruit & Fruit Salads",
+"parent": "fruit-veg/prepared-fruit-veg"
+},
+{
+"path": "fruit-veg/prepared-fruit-veg/slaws-salad-kits",
+"name": "Slaws & Salad Kits",
+"parent": "fruit-veg/prepared-fruit-veg"
+},
+{
+"path": "fruit-veg/prepared-fruit-veg/stir-fry-prepared-vegetables",
+"name": "Stir Fry & Prepared Vegetables",
+"parent": "fruit-veg/prepared-fruit-veg"
+},
+{
+"path": "fruit-veg/the-odd-bunch",
+"name": "The Odd Bunch",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/the-odd-bunch/odd-bunch-fruit",
+"name": "Odd Bunch Fruit",
+"parent": "fruit-veg/the-odd-bunch"
+},
+{
+"path": "fruit-veg/the-odd-bunch/odd-bunch-vegetables",
+"name": "Odd Bunch Vegetables",
+"parent": "fruit-veg/the-odd-bunch"
+},
+{
+"path": "fruit-veg/vegetables",
+"name": "Vegetables",
+"parent": "fruit-veg"
+},
+{
+"path": "fruit-veg/vegetables/asian-greens",
+"name": "Asian Greens",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/broccoli-cauliflower-cabbage",
+"name": "Broccoli, Cauliflower & Cabbage",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/carrots-root-vegetables",
+"name": "Carrots & Root Vegetables",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/chilli-garlic-ginger",
+"name": "Chilli, Garlic & Ginger",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/eggplant-courgette",
+"name": "Eggplant & Courgette",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/fresh-herbs",
+"name": "Fresh Herbs",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/in-season-vegetables",
+"name": "In Season Vegetables",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/mushrooms",
+"name": "Mushrooms",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/onions-leeks",
+"name": "Onions & Leeks",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/organic-vegetables",
+"name": "Organic Vegetables",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/peas-beans-corn",
+"name": "Peas, Beans & Corn",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/potato-kumara",
+"name": "Potato & Kumara",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/pumpkin-squash",
+"name": "Pumpkin & Squash",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/slaws-salad-kits",
+"name": "Slaws & Salad Kits",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/spinach-greens-kale",
+"name": "Spinach, Greens & Kale",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/sprouts-microgreens",
+"name": "Sprouts & Microgreens",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/stir-fry-prepared-vegetables",
+"name": "Stir Fry & Prepared Vegetables",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/the-odd-bunch",
+"name": "The Odd Bunch",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "fruit-veg/vegetables/tomatoes-cucumber-capsicum",
+"name": "Tomatoes, Cucumber & Capsicum",
+"parent": "fruit-veg/vegetables"
+},
+{
+"path": "health-body",
+"name": "Health & Body",
+"parent": ""
+},
+{
+"path": "health-body/bath-shower-soap",
+"name": "Bath, Shower & Soap",
+"parent": "health-body"
+},
+{
+"path": "health-body/contraception-pregnancy",
+"name": "Contraception & Pregnancy",
+"parent": "health-body"
+},
+{
+"path": "health-body/dental-oral-care",
+"name": "Dental & Oral Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/deodorant-body-sprays",
+"name": "Deodorant & Body Sprays",
+"parent": "health-body"
+},
+{
+"path": "health-body/eye-ear-care",
+"name": "Eye & Ear Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/hair-care",
+"name": "Hair Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/make-up-nail-care",
+"name": "Make Up & Nail Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/medical-first-aid",
+"name": "Medical & First Aid",
+"parent": "health-body"
+},
+{
+"path": "health-body/period-continence-care",
+"name": "Period & Continence Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/shaving-hair-removal",
+"name": "Shaving & Hair Removal",
+"parent": "health-body"
+},
+{
+"path": "health-body/skin-care-sun-care",
+"name": "Skin Care & Sun Care",
+"parent": "health-body"
+},
+{
+"path": "health-body/sports-nutrition-weight-management",
+"name": "Sports Nutrition & Weight Management",
+"parent": "health-body"
+},
+{
+"path": "health-body/tissues-cotton-wool",
+"name": "Tissues & Cotton Wool",
+"parent": "health-body"
+},
+{
+"path": "health-body/vitamins-supplements",
+"name": "Vitamins & Supplements",
+"parent": "health-body"
+},
+{
+"path": "household",
+"name": "Household",
+"parent": ""
+},
+{
+"path": "household/bags",
+"name": "Bags",
+"parent": "household"
+},
+{
+"path": "household/bathroom",
+"name": "Bathroom",
+"parent": "household"
+},
+{
+"path": "household/bathroom/bathroom-accessories",
+"name": "Bathroom Accessories",
+"parent": "household/bathroom"
+},
+{
+"path": "household/bathroom/tissues-wipes",
+"name": "Tissues & Wipes",
+"parent": "household/bathroom"
+},
+{
+"path": "household/bathroom/toilet-bathroom-cleaners",
+"name": "Toilet & Bathroom Cleaners",
+"parent": "household/bathroom"
+},
+{
+"path": "household/bathroom/toilet-paper",
+"name": "Toilet Paper",
+"parent": "household/bathroom"
+},
+{
+"path": "household/cleaning",
+"name": "Cleaning",
+"parent": "household"
+},
+{
+"path": "household/clothing-accessories",
+"name": "Clothing & Accessories",
+"parent": "household"
+},
+{
+"path": "household/entertainment-gifts",
+"name": "Entertainment & Gifts",
+"parent": "household"
+},
+{
+"path": "household/garden-garage",
+"name": "Garden & Garage",
+"parent": "household"
+},
+{
+"path": "household/hardware-electrical",
+"name": "Hardware & Electrical",
+"parent": "household"
+},
+{
+"path": "household/homewares",
+"name": "Homewares",
+"parent": "household"
+},
+{
+"path": "household/kitchen",
+"name": "Kitchen",
+"parent": "household"
+},
+{
+"path": "household/kitchen/clingfilm-foil-baking-paper",
+"name": "Clingfilm, Foil & Baking Paper",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/coffee-tea-making",
+"name": "Coffee & Tea Making",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/cooking-baking-equipment",
+"name": "Cooking & Baking Equipment",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/dishwashing",
+"name": "Dishwashing",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/food-storage-containers",
+"name": "Food Storage Containers",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/kitchen-cleaners",
+"name": "Kitchen Cleaners",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/lunch-boxes-drink-bottles",
+"name": "Lunch Boxes & Drink Bottles",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/paper-towels",
+"name": "Paper Towels",
+"parent": "household/kitchen"
+},
+{
+"path": "household/kitchen/sandwich-oven-freezer-bags",
+"name": "Sandwich, Oven & Freezer Bags",
+"parent": "household/kitchen"
+},
+{
+"path": "household/laundry",
+"name": "Laundry",
+"parent": "household"
+},
+{
+"path": "household/magazines-stationery",
+"name": "Magazines & Stationery",
+"parent": "household"
+},
+{
+"path": "household/pest-control",
+"name": "Pest Control",
+"parent": "household"
+},
+{
+"path": "meat-poultry",
+"name": "Meat & Poultry",
+"parent": ""
+},
+{
+"path": "meat-poultry/3-for-20",
+"name": "3 for $20",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/bbq-meat",
+"name": "BBQ Meat",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/beef",
+"name": "Beef",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/beef/bbq-beef",
+"name": "BBQ Beef",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/beef-mince-patties",
+"name": "Beef Mince & Patties",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/beef-sausages",
+"name": "Beef Sausages",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/ribs",
+"name": "Ribs",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/roast-beef",
+"name": "Roast Beef",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/steak",
+"name": "Steak",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/beef/stew-stir-fry",
+"name": "Stew & Stir Fry",
+"parent": "meat-poultry/beef"
+},
+{
+"path": "meat-poultry/chicken-poultry",
+"name": "Chicken & Poultry",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/lamb",
+"name": "Lamb",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/mince-patties",
+"name": "Mince & Patties",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/offal-bones",
+"name": "Offal & Bones",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/plant-based-alternatives",
+"name": "Plant Based Alternatives",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/pork",
+"name": "Pork",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/roast-meat",
+"name": "Roast Meat",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/sausages",
+"name": "Sausages",
+"parent": "meat-poultry"
+},
+{
+"path": "meat-poultry/venison-game",
+"name": "Venison & Game",
+"parent": "meat-poultry"
+},
+{
+"path": "pantry",
+"name": "Pantry",
+"parent": ""
+},
+{
+"path": "pantry/baking",
+"name": "Baking",
+"parent": "pantry"
+},
+{
+"path": "pantry/biscuits-crackers",
+"name": "Biscuits & Crackers",
+"parent": "pantry"
+},
+{
+"path": "pantry/bulk-foods",
+"name": "Bulk Foods",
+"parent": "pantry"
+},
+{
+"path": "pantry/cereals-spreads",
+"name": "Cereals & Spreads",
+"parent": "pantry"
+},
+{
+"path": "pantry/desserts",
+"name": "Desserts",
+"parent": "pantry"
+},
+{
+"path": "pantry/eggs",
+"name": "Eggs",
+"parent": "pantry"
+},
+{
+"path": "pantry/herbs-spices-stock",
+"name": "Herbs, Spices & Stock",
+"parent": "pantry"
+},
+{
+"path": "pantry/herbs-spices-stock/breadcrumbs-batter-stuffing",
+"name": "Breadcrumbs, Batter & Stuffing",
+"parent": "pantry/herbs-spices-stock"
+},
+{
+"path": "pantry/herbs-spices-stock/herbs-spices",
+"name": "Herbs & Spices",
+"parent": "pantry/herbs-spices-stock"
+},
+{
+"path": "pantry/herbs-spices-stock/salt-pepper-seasoning",
+"name": "Salt, Pepper & Seasoning",
+"parent": "pantry/herbs-spices-stock"
+},
+{
+"path": "pantry/herbs-spices-stock/stock",
+"name": "Stock",
+"parent": "pantry/herbs-spices-stock"
+},
+{
+"path": "pantry/international-foods",
+"name": "International Foods",
+"parent": "pantry"
+},
+{
+"path": "pantry/long-life-milk",
+"name": "Long Life Milk",
+"parent": "pantry"
+},
+{
+"path": "pantry/meal-kits",
+"name": "Meal Kits",
+"parent": "pantry"
+},
+{
+"path": "pantry/oil-vinegar-condiments",
+"name": "Oil, Vinegar & Condiments",
+"parent": "pantry"
+},
+{
+"path": "pantry/pasta-noodles-grains",
+"name": "Pasta, Noodles & Grains",
+"parent": "pantry"
+},
+{
+"path": "pantry/sauces-pastes",
+"name": "Sauces & Pastes",
+"parent": "pantry"
+},
+{
+"path": "pantry/snacks-sweets",
+"name": "Snacks & Sweets",
+"parent": "pantry"
+},
+{
+"path": "pantry/tinned-foods-packets",
+"name": "Tinned Foods & Packets",
+"parent": "pantry"
+},
+{
+"path": "pet",
+"name": "Pet",
+"parent": ""
+},
+{
+"path": "pet/birds-fish-small-animals",
+"name": "Birds, Fish & Small Animals",
+"parent": "pet"
+},
+{
+"path": "pet/cats",
+"name": "Cats",
+"parent": "pet"
+},
+{
+"path": "pet/dogs",
+"name": "Dogs",
+"parent": "pet"
+},
+{
+"path": "pet/pet-health-accessories",
+"name": "Pet Health & Accessories",
+"parent": "pet"
+}
+]
+}
